@@ -1,0 +1,17 @@
+services:
+  news-hub:
+    build: .
+    image: ai-news-hub:latest
+    container_name: ai-news-hub
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - news-data:/app/data
+      - ./config:/app/config:ro
+    environment:
+      - TZ=Asia/Shanghai
+
+volumes:
+  news-data:
+    driver: local

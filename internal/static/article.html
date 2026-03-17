@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文章详情 — AI News Hub</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">
+        <span class="logo-icon">📰</span>
+        <span>AI News Hub</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Article Detail -->
+  <main class="article-detail">
+    <button class="detail-back" onclick="history.back()">← 返回列表</button>
+
+    <div id="detailContent">
+      <div class="loading-wrap">
+        <div class="spinner"></div>
+        <p>加载中…</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // --- Article Detail Page Logic ---
+    (function () {
+      const API_BASE = '/api/v1';
+      const detailEl = document.getElementById('detailContent');
+
+      // Parse article ID from URL: /article.html?id=123
+      const params = new URLSearchParams(window.location.search);
+      const articleId = params.get('id');
+
+      if (!articleId) {
+        detailEl.innerHTML = '<div class="error-state"><p>缺少文章 ID</p></div>';
+        return;
+      }
+
+      // Update page title
+      document.title = '加载中… — AI News Hub';
+
+      fetch(`${API_BASE}/articles/${encodeURIComponent(articleId)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            detailEl.innerHTML = `<div class="error-state"><p>${data.message || '加载失败'}</p></div>`;
+            return;
+          }
+
+          const a = data;
+          document.title = `${a.title} — AI News Hub`;
+
+          const catClass = 'tag-' + (a.category ? slugify(a.category) : 'unknown');
+          const langClass = a.language === 'zh' ? 'zh' : 'en';
+          const langLabel = a.language === 'zh' ? '中' : 'EN';
+          const timeStr = formatTime(a.published_at || a.collected_at);
+
+          let contentHtml = '';
+          if (a.content_html) {
+            contentHtml = `<div class="detail-content">${a.content_html}</div>`;
+          } else if (a.summary) {
+            contentHtml = `<div class="detail-summary">${escapeHtml(a.summary)}</div>`;
+          }
+
+          detailEl.innerHTML = `
+            <div class="detail-card">
+              <h1 class="detail-title">${escapeHtml(a.title)}</h1>
+              <div class="detail-meta">
+                <span class="detail-source">${escapeHtml(a.source)}</span>
+                <span class="card-dot">·</span>
+                <span class="detail-time">${timeStr}</span>
+                <span class="card-lang ${langClass}">${langLabel}</span>
+                <span class="tag ${catClass}">${escapeHtml(a.category || '未分类')}</span>
+              </div>
+              ${contentHtml}
+              <a class="detail-cta" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">阅读原文 ↗</a>
+            </div>
+          `;
+        })
+        .catch(err => {
+          detailEl.innerHTML = '<div class="error-state"><p>网络错误，请重试</p></div>';
+          console.error('Article fetch error:', err);
+        });
+
+      function slugify(text) {
+        return text.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+      }
+
+      function formatTime(dateStr) {
+        if (!dateStr) return '';
+        try {
+          const d = new Date(dateStr);
+          const now = new Date();
+          const diff = now - d;
+          if (diff < 60000) return '刚刚';
+          if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+          if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+          if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+          return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        } catch {
+          return dateStr;
+        }
+      }
+    })();
+  </script>
+</body>
+</html>

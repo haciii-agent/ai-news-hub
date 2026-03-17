@@ -1,0 +1,20 @@
+# AI News Hub Configuration
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+database:
+  path: "./data/news.db"
+
+collector:
+  user_agent: "ai-news-hub/1.0"
+  timeout: 30s
+  max_concurrent: 5
+  request_interval: "2-5s"
+
+classifier:
+  rules_path: "./config/rules.yaml"
+
+log:
+  level: "info"

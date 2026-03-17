@@ -1,0 +1,572 @@
+# =============================================================================
+# AI News Hub - 分类规则配置 (T004)
+# =============================================================================
+# 共 8 个分类：AI/ML、科技前沿、商业动态、开源生态、学术研究、政策监管、产品发布、综合资讯（兜底）
+#
+# 维护说明：
+#   - 含 # PERIODIC_UPDATE 标注的关键词为时效性关键词，需定期维护更新
+#   - 每个分类下 keywords 为基础关键词，boost_keywords 为高权重关键词
+#   - 分类引擎对 title + summary 做关键词匹配，计算加权得分，取最高分分类
+#   - 数据源的 category 字段可作为预分类权重加成
+#   - 修改此文件后支持热更新，无需重启服务
+# =============================================================================
+
+# 预分类权重：当数据源的 category 与规则分类匹配时，额外加成的分数
+source_category_boost: 2.0
+
+# 各分类的关键词规则
+categories:
+
+  # ---------------------------------------------------------------------------
+  # AI/ML - 人工智能与机器学习
+  # ---------------------------------------------------------------------------
+  ai_ml:
+    name: "AI/ML"
+    # 匹配到任一关键词 +1 分
+    keywords:
+      - artificial intelligence
+      - machine learning
+      - deep learning
+      - neural network
+      - natural language processing
+      - NLP
+      - computer vision
+      - large language model
+      - LLM
+      - GPT
+      - ChatGPT
+      - OpenAI
+      - Claude # PERIODIC_UPDATE
+      - Claude 4 # PERIODIC_UPDATE
+      - Gemini # PERIODIC_UPDATE
+      - Gemini 2 # PERIODIC_UPDATE
+      - GPT-5 # PERIODIC_UPDATE
+      - GPT-4o
+      - GPT-4
+      - o1 # PERIODIC_UPDATE
+      - o3 # PERIODIC_UPDATE
+      - generative AI
+      - reinforcement learning
+      - transformer
+      - diffusion model
+      - foundation model
+      - multimodal
+      - AGI
+      - artificial general intelligence
+      - alignment
+      - AI safety
+      - prompt engineering
+      - RAG
+      - retrieval augmented generation
+      - fine-tuning
+      - LoRA
+      - RLHF
+      - 人工智能
+      - 机器学习
+      - 深度学习
+      - 神经网络
+      - 自然语言处理
+      - 大模型
+      - 大语言模型
+      - 通用人工智能
+      - 多模态
+      - 生成式AI
+      - AIGC
+      - 大模型
+      - 智能体
+      - Agent
+      - Copilot
+      - 机器人
+      - 自动驾驶
+      - autonomous driving
+      - self-driving
+      - speech recognition
+      - 语音识别
+      - 图像生成
+      - image generation
+      - Stable Diffusion
+      - Midjourney
+      - Sora # PERIODIC_UPDATE
+      - DALL-E
+      - Whispe
+      - TTS
+      - text-to-speech
+    # 匹配到任一加权关键词 +3 分
+    boost_keywords:
+      - LLM
+      - GPT
+      - ChatGPT
+      - 大语言模型
+      - 大模型
+      - Claude # PERIODIC_UPDATE
+      - GPT-5 # PERIODIC_UPDATE
+      - AGI
+      - AIGC
+      - foundation model
+
+  # ---------------------------------------------------------------------------
+  # 科技前沿 - 前沿技术（非AI）
+  # ---------------------------------------------------------------------------
+  tech_frontier:
+    name: "科技前沿"
+    keywords:
+      - quantum computing
+      - 量子计算
+      - blockchain
+      - 区块链
+      - cryptocurrency
+      - crypto
+      - Bitcoin
+      - 以太坊
+      - Ethereum
+      - Web3
+      - metaverse
+      - 元宇宙
+      - AR
+      - VR
+      - augmented reality
+      - virtual reality
+      - mixed reality
+      - extended reality
+      - XR
+      - spatial computing
+      - brain-computer interface
+      - 脑机接口
+      - neuromorphic
+      - 6G
+      - edge computing
+      - 边缘计算
+      - IoT
+      - 物联网
+      - autonomous vehicle
+      - drone
+      - 无人机
+      - robotics
+      - satellite
+      - 卫星
+      - SpaceX
+      - Tesla
+      - reusable rocket
+      - 5G
+      - 6G
+      - chip
+      - semiconductor
+      - 芯片
+      - 半导体
+      - TSMC
+      - 台积电
+      - Moore's law
+      - RISC-V
+      - ARM
+      - 柔性电子
+      - flexible electronics
+      - biotech
+      - biotechnology
+      - gene editing
+      - CRISPR
+      - synthetic biology
+      - fusion
+      - nuclear
+      - nuclear fusion
+      - 可控核聚变
+    boost_keywords:
+      - quantum computing
+      - 量子计算
+      - semiconductor
+      - 芯片
+      - TSMC
+      - 台积电
+      - brain-computer interface
+      - 脑机接口
+      - nuclear fusion
+      - 可控核聚变
+
+  # ---------------------------------------------------------------------------
+  # 商业动态 - 融资、并购、市场
+  # ---------------------------------------------------------------------------
+  business:
+    name: "商业动态"
+    keywords:
+      - funding
+      - fundraising
+      - fundraiser
+      - investment
+      - startup
+      - IPO
+      - acquisition
+      - merger
+      - 融资
+      - 投资
+      - 并购
+      - 收购
+      - 上市
+      - 独角兽
+      - unicorn
+      - valuation
+      - 估值
+      - revenue
+      - market share
+      - 市场份额
+      - venture capital
+      - VC
+      - Series A
+      - Series B
+      - Series C
+      - seed round
+      - seed funding
+      - IPO
+      - initial public offering
+      - IPO
+      - 风险投资
+      - 天使投资
+      - business
+      - enterprise
+      - 企业
+      - company
+      - layoff
+      - 裁员
+      - partnership
+      - 合作
+      - 战略合作
+      - joint venture
+      - 合资
+      - revenue
+      - 盈利
+      - 亏损
+      - profit
+      - loss
+      - CEO
+      - CTO
+      - chief
+      - executive
+      - 高管
+      - founder
+      - 创始人
+      - startup
+      - 初创
+      - 创业
+    boost_keywords:
+      - 融资
+      - IPO
+      - 并购
+      - 独角兽
+      - unicorn
+      - Series A
+      - Series B
+      - 风险投资
+      - valuation
+      - 估值
+
+  # ---------------------------------------------------------------------------
+  # 开源生态 - 开源项目、社区
+  # ---------------------------------------------------------------------------
+  open_source:
+    name: "开源生态"
+    keywords:
+      - open source
+      - 开源
+      - open-source
+      - GitHub
+      - GitLab
+      - repository
+      - release
+      - version
+      - pull request
+      - PR
+      - commit
+      - contribution
+      - 贡献
+      - fork
+      - Linux
+      - Kubernetes
+      - k8s
+      - Docker
+      - container
+      - 容器
+      - microservice
+      - 微服务
+      - serverless
+      - cloud native
+      - 云原生
+      - Rust
+      - Python
+      - Go lang
+      - golang
+      - TypeScript
+      - Node.js
+      - framework
+      - 框架
+      - library
+      - 库
+      - package
+      - dependency
+      - license
+      - MIT
+      - Apache
+      - GPL
+      - community
+      - 社区
+      - maintainer
+      - contributor
+      - Hugging Face
+      - PyTorch
+      - TensorFlow
+      - JAX
+      - LangChain
+      - LlamaIndex
+      - OSS
+    boost_keywords:
+      - open source
+      - 开源
+      - GitHub
+      - Kubernetes
+      - cloud native
+      - 云原生
+      - Hugging Face
+      - PyTorch
+      - TensorFlow
+
+  # ---------------------------------------------------------------------------
+  # 学术研究 - 论文、学术突破
+  # ---------------------------------------------------------------------------
+  research:
+    name: "学术研究"
+    keywords:
+      - research
+      - 研究
+      - paper
+      - 论文
+      - publication
+      - arXiv
+      - conference
+      - 会议
+      - NeurIPS
+      - ICML
+      - ICLR
+      - CVPR
+      - ACL
+      - EMNLP
+      - AAAI
+      - IJCAI
+      - SIGGRAPH
+      - Nature
+      - Science
+      - journal
+      - 期刊
+      - university
+      - 大学
+      - lab
+      - laboratory
+      - 实验室
+      - professor
+      - 教授
+      - researcher
+      - 研究员
+      - PhD
+      - 博士
+      - breakthrough
+      - 突破
+      - novel
+      - propose
+      - proposed
+      - state-of-the-art
+      - SOTA
+      - benchmark
+      - 基准
+      - dataset
+      - 数据集
+      - experiment
+      - 实验
+      - empirical
+      - peer review
+      - 同行评审
+      - citation
+      - 引用
+      - theorem
+      - 定理
+      - proof
+      - 证明
+    boost_keywords:
+      - arXiv
+      - 论文
+      - paper
+      - NeurIPS
+      - ICML
+      - ICLR
+      - CVPR
+      - breakthrough
+      - 突破
+      - state-of-the-art
+
+  # ---------------------------------------------------------------------------
+  # 政策监管 - 法律法规、监管
+  # ---------------------------------------------------------------------------
+  policy:
+    name: "政策监管"
+    keywords:
+      - regulation
+      - 监管
+      - policy
+      - 政策
+      - law
+      - 法律
+      - legislation
+      - 立法
+      - compliance
+      - 合规
+      - GDPR
+      - privacy
+      - 隐私
+      - data protection
+      - 数据保护
+      - cybersecurity
+      - 网络安全
+      - security
+      - 安全
+      - EU AI Act
+      - AI Act
+      - 人工智能法案
+      - ban
+      - 禁止
+      - restrict
+      - 限制
+      - censorship
+      - 审查
+      - government
+      - 政府
+      - congress
+      - 国会
+      - parliament
+      - 议会
+      - senator
+      - 参议员
+      - FDA
+      - FTC
+      - antitrust
+      - 反垄断
+      - copyright
+      - 版权
+      - intellectual property
+      - 知识产权
+      - patent
+      - 专利
+      - lawsuit
+      - 诉讼
+      - court
+      - 法院
+      - ruling
+      - 裁决
+      - ethics
+      - 伦理
+      - guideline
+      - 指南
+      - standard
+      - 标准
+      - framework
+      - 红线
+      - 备案
+      - 算法备案
+      - 深度合成
+      - deep synthesis
+    boost_keywords:
+      - regulation
+      - 监管
+      - EU AI Act
+      - AI Act
+      - 人工智能法案
+      - antitrust
+      - 反垄断
+      - lawsuit
+      - 诉讼
+      - GDPR
+      - privacy
+      - 隐私
+
+  # ---------------------------------------------------------------------------
+  # 产品发布 - 新产品、版本更新
+  # ---------------------------------------------------------------------------
+  product:
+    name: "产品发布"
+    keywords:
+      - launch
+      - release
+      - 发布
+      - announce
+      - announcement
+      - announced
+      - unveil
+      - introduced
+      - debut
+      - upgrade
+      - 更新
+      - update
+      - new version
+      - 新版本
+      - beta
+      - alpha
+      - preview
+      - 预览
+      - early access
+      - feature
+      - 功能
+      - integration
+      - 集成
+      - plugin
+      - extension
+      - API
+      - SDK
+      - tool
+      - 工具
+      - platform
+      - 平台
+      - service
+      - 服务
+      - app
+      - application
+      - software
+      - 硬件
+      - hardware
+      - device
+      - 设备
+      - phone
+      - 手机
+      - model
+      - 型号
+      - GPT-5 # PERIODIC_UPDATE
+      - Claude 4 # PERIODIC_UPDATE
+      - Gemini 2 # PERIODIC_UPDATE
+      - iPhone
+      - Pixel
+      - Samsung
+      - Apple
+      - Google
+      - Microsoft
+      - Meta
+      - Amazon
+      - NVIDIA
+      - AMD
+      - Intel
+      - version
+      - 版本
+      - changelog
+      - 更新日志
+    boost_keywords:
+      - launch
+      - 发布
+      - announce
+      - announce
+      - GPT-5 # PERIODIC_UPDATE
+      - Claude 4 # PERIODIC_UPDATE
+      - Gemini 2 # PERIODIC_UPDATE
+      - iPhone
+      - Pixel
+      - unveil
+      - debut
+
+  # ---------------------------------------------------------------------------
+  # 综合资讯 - 兜底分类（无特殊关键词，所有未匹配文章归入此类）
+  # ---------------------------------------------------------------------------
+  general:
+    name: "综合资讯"
+    keywords: []
+    boost_keywords: []
