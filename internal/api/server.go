@@ -36,7 +36,7 @@ func NewServer(db *sql.DB, cfg *config.Config) (*Server, error) {
 	}
 
 	// Initialize collect scheduler
-	sched := collector.NewCollectScheduler()
+	sched := collector.NewCollectScheduler(&cfg.Collector)
 
 	srv := &Server{
 		DB:         db,
@@ -67,6 +67,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/categories", s.categoriesHandler)
 	mux.HandleFunc("/api/v1/collect", s.CollectSvc.HandleCollect)
 	mux.HandleFunc("/api/v1/collect/status", s.CollectSvc.HandleCollectStatus)
+	mux.HandleFunc("/api/v1/stats", s.CollectSvc.HandleStats)
+	mux.HandleFunc("/api/v1/articles/cleanup", s.CollectSvc.HandleCleanup)
 
 	// Static files (embed.FS) — serve at root, API takes precedence
 	staticFS := http.FileServer(http.FS(static.FS()))

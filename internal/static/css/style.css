@@ -121,6 +121,20 @@ a:hover {
   font-weight: 600;
 }
 
+.header-center {
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+}
+
+.last-collect {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* --- Category Tabs --- */
 .category-bar {
   background: var(--surface);

@@ -39,6 +39,7 @@ type CollectorConfig struct {
 	Timeout       time.Duration `yaml:"timeout"`
 	MaxConcurrent int           `yaml:"max_concurrent"`
 	RequestInterval string      `yaml:"request_interval"`
+	RSSMaxItems    int         `yaml:"rss_max_items"`
 }
 
 // ClassifierConfig holds classifier settings.
@@ -84,6 +85,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Collector.RequestInterval == "" {
 		cfg.Collector.RequestInterval = "2-5s"
+	}
+	if cfg.Collector.RSSMaxItems == 0 {
+		cfg.Collector.RSSMaxItems = 20
 	}
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"

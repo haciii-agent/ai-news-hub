@@ -97,6 +97,7 @@ type RSSCollector struct {
 	maxWorkers   int
 	userAgent    string
 	fetchTimeout time.Duration
+	maxItems     int
 }
 
 // RSSOption 采集器配置选项。
@@ -125,12 +126,22 @@ func WithFetchTimeout(d time.Duration) RSSOption {
 	}
 }
 
+// WithMaxItems 设置每源最大采集条数。
+func WithMaxItems(n int) RSSOption {
+	return func(c *RSSCollector) {
+		if n > 0 {
+			c.maxItems = n
+		}
+	}
+}
+
 // NewRSSCollector 创建 RSS 采集器实例。
 func NewRSSCollector(opts ...RSSOption) *RSSCollector {
 	c := &RSSCollector{
 		maxWorkers:   5,
 		userAgent:    "ai-news-hub/1.0",
 		fetchTimeout: 15 * time.Second,
+		maxItems:     20,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -303,6 +314,9 @@ func (c *RSSCollector) convertRSSItems(items []rssItem, src Source) []Article {
 			Language:    src.Language,
 		})
 	}
+	if len(articles) > c.maxItems {
+		articles = articles[:c.maxItems]
+	}
 	return articles
 }
 
@@ -345,6 +359,9 @@ func (c *RSSCollector) convertAtomEntries(entries []atomEntry, src Source) []Art
 			SourceURL:   src.URL,
 			Language:    src.Language,
 		})
+	}
+	if len(articles) > c.maxItems {
+		articles = articles[:c.maxItems]
 	}
 	return articles
 }

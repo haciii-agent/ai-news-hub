@@ -41,6 +41,8 @@ type ArticleStore interface {
 	QueryArticles(filter ArticleFilter) ([]Article, int, error)
 	GetArticleByID(id int64) (*Article, error)
 	GetCategoryStats() ([]CategoryStat, error)
+	GetLanguageCounts() (map[string]int, error)
+	DeleteArticlesBefore(before string) (int64, error)
 	InsertCollectRun(run *CollectRun) (int64, error)
 	GetLatestCollectRun() (*CollectRun, error)
 }
@@ -297,9 +299,10 @@ func (s *articleStore) GetCategoryStats() ([]CategoryStat, error) {
 // InsertCollectRun creates a new collect_runs record and returns its ID.
 func (s *articleStore) InsertCollectRun(run *CollectRun) (int64, error) {
 	res, err := s.db.Exec(`
-		INSERT INTO collect_runs (status, total_collected, total_new, errors_count, errors)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO collect_runs (started_at, status, total_collected, total_new, errors_count, errors)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`,
+		run.StartedAt,
 		run.Status,
 		run.TotalCollected,
 		run.TotalNew,
@@ -311,6 +314,35 @@ func (s *articleStore) InsertCollectRun(run *CollectRun) (int64, error) {
 	}
 	id, _ := res.LastInsertId()
 	return id, nil
+}
+
+// GetLanguageCounts returns article counts grouped by language.
+func (s *articleStore) GetLanguageCounts() (map[string]int, error) {
+	rows, err := s.db.Query(`SELECT language, COUNT(*) FROM articles GROUP BY language`)
+	if err != nil {
+		return nil, fmt.Errorf("language counts: %w", err)
+	}
+	defer rows.Close()
+
+	counts := map[string]int{}
+	for rows.Next() {
+		var lang string
+		var count int
+		if err := rows.Scan(&lang, &count); err != nil {
+			return nil, fmt.Errorf("scan language count: %w", err)
+		}
+		counts[lang] = count
+	}
+	return counts, rows.Err()
+}
+
+// DeleteArticlesBefore deletes articles with collected_at before the given date string (YYYY-MM-DD).
+func (s *articleStore) DeleteArticlesBefore(before string) (int64, error) {
+	result, err := s.db.Exec(`DELETE FROM articles WHERE date(collected_at) < date(?)`, before)
+	if err != nil {
+		return 0, fmt.Errorf("delete articles before %s: %w", before, err)
+	}
+	return result.RowsAffected()
 }
 
 // GetLatestCollectRun returns the most recent collect_runs record, or nil if none exist.

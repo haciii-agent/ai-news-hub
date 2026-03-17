@@ -23,6 +23,8 @@
   const statsFooter = document.getElementById('statsFooter');
   const langSwitcher = document.getElementById('langSwitcher');
   const categoryTabs = document.getElementById('categoryTabs');
+  const collectStatus = document.getElementById('collectStatus');
+  const lastCollectTime = document.getElementById('lastCollectTime');
 
   // --- Category tag color mapping ---
   const CATEGORY_COLORS = {
@@ -49,6 +51,7 @@
     bindEvents();
     await loadCategories();
     await loadArticles();
+    loadStats();
   }
 
   // --- Events ---
@@ -264,6 +267,26 @@
 
   function escapeAttr(str) {
     return escapeHtml(str);
+  }
+
+  // --- Load stats ---
+  async function loadStats() {
+    try {
+      const res = await fetch(`${API_BASE}/stats`);
+      const data = await res.json();
+      if (data.latest_collect && data.latest_collect.finished_at) {
+        const time = formatTime(data.latest_collect.finished_at);
+        const text = '最近采集: ' + time + ' · 新增 ' + (data.latest_collect.total_new || 0) + ' 篇';
+        collectStatus.textContent = text + ' · 共 ' + data.total_articles + ' 篇';
+        if (lastCollectTime) {
+          lastCollectTime.textContent = text;
+        }
+      } else {
+        collectStatus.textContent = '共 ' + (data.total_articles || 0) + ' 篇文章';
+      }
+    } catch (err) {
+      // 静默失败
+    }
   }
 
 })();

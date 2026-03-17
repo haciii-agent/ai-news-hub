@@ -1,16 +1,23 @@
 // Package collector provides RSS and HTML news collection capabilities.
 package collector
 
+import "ai-news-hub/config"
+
 // CollectScheduler 统一调度入口：并发采集所有数据源（RSS + HTML）。
 type CollectScheduler struct {
 	rssCollector  *RSSCollector
 	htmlCollector *HTMLCollector
 }
 
-// NewCollectScheduler 创建统一采集调度器，使用默认配置。
-func NewCollectScheduler() *CollectScheduler {
+// NewCollectScheduler 创建统一采集调度器。
+func NewCollectScheduler(cfg *config.CollectorConfig) *CollectScheduler {
 	return &CollectScheduler{
-		rssCollector: NewRSSCollector(),
+		rssCollector: NewRSSCollector(
+			WithFetchTimeout(cfg.Timeout),
+			WithMaxItems(cfg.RSSMaxItems),
+			WithUserAgent(cfg.UserAgent),
+			WithMaxWorkers(cfg.MaxConcurrent),
+		),
 		htmlCollector: NewHTMLCollector(
 			WithHTMLMaxWorkers(3),
 			func(c *HTMLCollector) {

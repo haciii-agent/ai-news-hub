@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"ai-news-hub/internal/collector"
@@ -17,6 +18,8 @@ type CollectService struct {
 	Scheduler  *collector.CollectScheduler
 	Classifier *classifier.Manager
 	Store      store.ArticleStore
+	mu         sync.Mutex   // 采集并发锁
+	collecting bool         // 采集进行中标记
 }
 
 // CollectRequest 触发采集的请求体（目前所有字段可选）。
@@ -52,6 +55,14 @@ type SourceStat struct {
 	Classified int    `json:"classified"`
 }
 
+// StatsResponse 站点概览统计响应。
+type StatsResponse struct {
+	TotalArticles int                       `json:"total_articles"`
+	TotalCategories int                     `json:"total_categories"`
+	ArticleCountByLanguage map[string]int   `json:"article_count_by_language"`
+	LatestCollect *store.CollectRun         `json:"latest_collect,omitempty"`
+}
+
 // HandleCollect POST /api/v1/collect — 触发完整采集流程。
 //
 // 完整流程: CollectAll() → Classify() → BatchInsertArticles()
@@ -61,6 +72,21 @@ func (s *CollectService) HandleCollect(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "only POST allowed")
 		return
 	}
+
+	// 采集并发锁
+	s.mu.Lock()
+	if s.collecting {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, "采集正在进行中，请稍后再试")
+		return
+	}
+	s.collecting = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.collecting = false
+		s.mu.Unlock()
+	}()
 
 	startedAt := time.Now()
 	startedAtStr := startedAt.UTC().Format(time.RFC3339)
@@ -79,7 +105,6 @@ func (s *CollectService) HandleCollect(w http.ResponseWriter, r *http.Request) {
 
 	for _, cr := range collectResults {
 		if cr.Err != nil {
-			// 采集失败，记录错误但继续处理其他源
 			sourceErrors = append(sourceErrors, SourceError{
 				Source: cr.Source.Name,
 				Type:   "collect",
@@ -230,4 +255,64 @@ func (s *CollectService) HandleCollectStatus(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusOK, run)
+}
+
+// HandleStats GET /api/v1/stats — 站点概览统计。
+func (s *CollectService) HandleStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "only GET allowed")
+		return
+	}
+
+	stats, err := s.Store.GetCategoryStats()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get stats")
+		return
+	}
+
+	langCounts, err := s.Store.GetLanguageCounts()
+	if err != nil {
+		langCounts = map[string]int{}
+	}
+
+	latestRun, _ := s.Store.GetLatestCollectRun()
+
+	var totalArticles int
+	for _, s := range stats {
+		totalArticles += s.Count
+	}
+
+	writeJSON(w, http.StatusOK, StatsResponse{
+		TotalArticles:        totalArticles,
+		TotalCategories:      len(stats),
+		ArticleCountByLanguage: langCounts,
+		LatestCollect:        latestRun,
+	})
+}
+
+// HandleCleanup DELETE /api/v1/articles/cleanup?before=YYYY-MM-DD — 清理旧文章。
+func (s *CollectService) HandleCleanup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeError(w, http.StatusMethodNotAllowed, "only DELETE allowed")
+		return
+	}
+
+	before := r.URL.Query().Get("before")
+	if before == "" {
+		writeError(w, http.StatusBadRequest, "missing 'before' parameter (format: YYYY-MM-DD)")
+		return
+	}
+
+	deleted, err := s.Store.DeleteArticlesBefore(before)
+	if err != nil {
+		log.Printf("[collect] cleanup failed: %v", err)
+		writeError(w, http.StatusInternalServerError, "cleanup failed")
+		return
+	}
+
+	log.Printf("[collect] 🗑️ 清理了 %d 篇早于 %s 的文章", deleted, before)
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"deleted":  deleted,
+		"before":   before,
+	})
 }

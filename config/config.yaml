@@ -12,6 +12,7 @@ collector:
   timeout: 30s
   max_concurrent: 5
   request_interval: "2-5s"
+  rss_max_items: 30
 
 classifier:
   rules_path: "./config/rules.yaml"
