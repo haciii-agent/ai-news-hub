@@ -290,6 +290,62 @@ func (s *CollectService) HandleStats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// SourcesResponse 数据源列表响应。
+type SourcesResponse struct {
+	Sources []SourceItem `json:"sources"`
+}
+
+// SourceItem 单个数据源信息。
+type SourceItem struct {
+	Name     string `json:"name"`
+	URL      string `json:"url"`
+	Type     string `json:"type"`
+	Language string `json:"language"`
+	Status   string `json:"status"` // "active" | "failed" | "unknown"
+}
+
+// HandleSources GET /api/v1/sources — 返回数据源列表和状态。
+func (s *CollectService) HandleSources(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "only GET allowed")
+		return
+	}
+
+	allSources := collector.AllSources()
+
+	// 查询最近一次采集的错误信息，用于判断源状态
+	var failedSources map[string]bool
+	latestRun, err := s.Store.GetLatestCollectRun()
+	if err == nil && latestRun != nil && latestRun.Errors != nil {
+		var errors []SourceError
+		if jsonErr := json.Unmarshal([]byte(*latestRun.Errors), &errors); jsonErr == nil {
+			failedSources = make(map[string]bool, len(errors))
+			for _, e := range errors {
+				if e.Type == "collect" {
+					failedSources[e.Source] = true
+				}
+			}
+		}
+	}
+
+	items := make([]SourceItem, 0, len(allSources))
+	for _, src := range allSources {
+		status := "active"
+		if failedSources != nil && failedSources[src.Name] {
+			status = "failed"
+		}
+		items = append(items, SourceItem{
+			Name:     src.Name,
+			URL:      src.URL,
+			Type:     src.Type,
+			Language: src.Language,
+			Status:   status,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, SourcesResponse{Sources: items})
+}
+
 // HandleCleanup DELETE /api/v1/articles/cleanup?before=YYYY-MM-DD — 清理旧文章。
 func (s *CollectService) HandleCleanup(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {

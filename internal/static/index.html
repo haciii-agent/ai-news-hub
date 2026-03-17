@@ -14,24 +14,36 @@
     <div class="header-left">
       <a href="/" class="header-logo">
         <span class="logo-icon">📰</span>
-        <span>AI News Hub</span>
+        <span>AI News <span class="logo-text-accent">Hub</span></span>
       </a>
+      <span class="header-clock" id="headerClock"></span>
     </div>
-    <div class="header-center">
-      <span id="lastCollectTime" class="last-collect"></span>
+    <div class="header-right">
+      <div class="collect-status-badge never_run" id="collectStatus" style="display:none;"></div>
+      <div class="lang-switcher" id="langSwitcher">
+        <button class="lang-btn active" data-lang="all">全部</button>
+        <button class="lang-btn" data-lang="zh">中文</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
     </div>
-    <div class="lang-switcher" id="langSwitcher">
-      <button class="lang-btn active" data-lang="all">全部</button>
-      <button class="lang-btn" data-lang="zh">中文</button>
-      <button class="lang-btn" data-lang="en">EN</button>
-    </div>
-    <div class="collect-status" id="collectStatus"></div>
   </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar" id="statsBar">
+    <span class="stat-item">共 <span class="stat-value" id="statTotal">—</span> 篇</span>
+    <span class="stat-sep">·</span>
+    <span class="stat-item">中文 <span class="stat-value" id="statZh">—</span></span>
+    <span class="stat-sep">·</span>
+    <span class="stat-item">英文 <span class="stat-value" id="statEn">—</span></span>
+    <span class="stat-sep">·</span>
+    <span class="stat-item" id="statCategoriesWrap"><span class="stat-value" id="statCategories">—</span> 个分类</span>
+    <span class="stat-sep">·</span>
+    <span class="stat-item" id="statLastCollect">最近采集: —</span>
+  </div>
 
   <!-- Category Bar -->
   <nav class="category-bar" id="categoryBar">
-    <div class="category-scroll" id="categoryScroll">
-      <div class="category-tabs" id="categoryTabs">
+    <div class="category-tabs" id="categoryTabs">
       <!-- Dynamically populated -->
     </div>
   </nav>
@@ -43,6 +55,7 @@
       <div class="skeleton-card"><div class="skeleton-rank"></div><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
       <div class="skeleton-card"><div class="skeleton-rank"></div><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
       <div class="skeleton-card"><div class="skeleton-rank"></div><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-rank"></div><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
     </div>
 
     <div id="loadMoreWrap" class="load-more-wrap" style="display:none;">
@@ -50,6 +63,7 @@
     </div>
 
     <div id="statsFooter" class="stats-footer"></div>
+    <div class="footer-copyright">AI News Hub v0.3.0 · Built with ⚡</div>
   </main>
 
   <script src="js/app.js"></script>

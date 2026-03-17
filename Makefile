@@ -2,10 +2,11 @@
 
 BINARY := ai-news-hub
 PORT   ?= 8080
+VERSION ?= 0.3.0
 
 # ---------- Go ----------
 build:
-	CGO_ENABLED=1 go build -o $(BINARY) .
+	CGO_ENABLED=1 go build -ldflags "-s -w -X main.version=$(VERSION)" -o $(BINARY) .
 
 run: build
 	./$(BINARY)

@@ -14,7 +14,7 @@
     <div class="header-left">
       <a href="/" class="header-logo">
         <span class="logo-icon">📰</span>
-        <span>AI News Hub</span>
+        <span>AI News <span class="logo-text-accent">Hub</span></span>
       </a>
     </div>
   </header>
@@ -31,6 +31,8 @@
     </div>
   </main>
 
+  <div class="footer-copyright">AI News Hub v0.3.0 · Built with ⚡</div>
+
   <script>
     // --- Article Detail Page Logic ---
     (function () {
@@ -42,7 +44,7 @@
       const articleId = params.get('id');
 
       if (!articleId) {
-        detailEl.innerHTML = '<div class="error-state"><p>缺少文章 ID</p></div>';
+        detailEl.innerHTML = '<div class="error-state"><div class="error-icon">🤷</div><p>缺少文章 ID</p></div>';
         return;
       }
 
@@ -53,7 +55,7 @@
         .then(res => res.json())
         .then(data => {
           if (data.error) {
-            detailEl.innerHTML = `<div class="error-state"><p>${data.message || '加载失败'}</p></div>`;
+            detailEl.innerHTML = `<div class="error-state"><div class="error-icon">😔</div><p>${escapeHtml(data.message || '加载失败')}</p></div>`;
             return;
           }
 
@@ -62,7 +64,7 @@
 
           const catClass = 'tag-' + (a.category ? slugify(a.category) : 'unknown');
           const langClass = a.language === 'zh' ? 'zh' : 'en';
-          const langLabel = a.language === 'zh' ? '中' : 'EN';
+          const langLabel = a.language === 'zh' ? '🇨🇳 中文' : '🇬🇧 EN';
           const timeStr = formatTime(a.published_at || a.collected_at);
 
           let contentHtml = '';
@@ -76,19 +78,19 @@
             <div class="detail-card">
               <h1 class="detail-title">${escapeHtml(a.title)}</h1>
               <div class="detail-meta">
-                <span class="detail-source">${escapeHtml(a.source)}</span>
+                <span class="detail-source">📌 ${escapeHtml(a.source)}</span>
                 <span class="card-dot">·</span>
-                <span class="detail-time">${timeStr}</span>
+                <span class="detail-time">🕐 ${timeStr}</span>
                 <span class="card-lang ${langClass}">${langLabel}</span>
                 <span class="tag ${catClass}">${escapeHtml(a.category || '未分类')}</span>
               </div>
               ${contentHtml}
-              <a class="detail-cta" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">阅读原文 ↗</a>
+              <a class="detail-cta" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">阅读原文 →</a>
             </div>
           `;
         })
         .catch(err => {
-          detailEl.innerHTML = '<div class="error-state"><p>网络错误，请重试</p></div>';
+          detailEl.innerHTML = '<div class="error-state"><div class="error-icon">🔌</div><p>网络错误，请重试</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
           console.error('Article fetch error:', err);
         });
 

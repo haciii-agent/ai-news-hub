@@ -22,10 +22,11 @@ type Server struct {
 	Store      store.ArticleStore
 	CollectSvc *CollectService
 	Classifier *classifier.Manager
+	Version    string
 }
 
 // NewServer creates a fully-wired HTTP server with all routes registered.
-func NewServer(db *sql.DB, cfg *config.Config) (*Server, error) {
+func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) {
 	// Initialize store
 	articleStore := store.NewArticleStore(db)
 
@@ -43,6 +44,7 @@ func NewServer(db *sql.DB, cfg *config.Config) (*Server, error) {
 		Cfg:        cfg,
 		Store:      articleStore,
 		Classifier: clr,
+		Version:    version,
 		CollectSvc: &CollectService{
 			Scheduler:  sched,
 			Classifier: clr,
@@ -69,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/collect/status", s.CollectSvc.HandleCollectStatus)
 	mux.HandleFunc("/api/v1/stats", s.CollectSvc.HandleStats)
 	mux.HandleFunc("/api/v1/articles/cleanup", s.CollectSvc.HandleCleanup)
+	mux.HandleFunc("/api/v1/sources", s.CollectSvc.HandleSources)
 
 	// Static files (embed.FS) — serve at root, API takes precedence
 	staticFS := http.FileServer(http.FS(static.FS()))
@@ -85,6 +88,7 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  GET  /api/v1/categories")
 	log.Println("  POST /api/v1/collect")
 	log.Println("  GET  /api/v1/collect/status")
+	log.Println("  GET  /api/v1/sources")
 	log.Println("  GET  /  (static files via embed.FS)")
 	log.Println("  CORS: AllowAll (development)")
 
@@ -127,7 +131,7 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "ok",
 		"service": "ai-news-hub",
-		"version": "0.1.0",
+		"version": s.Version,
 	})
 }
 

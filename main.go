@@ -17,6 +17,9 @@ import (
 	"ai-news-hub/internal/store"
 )
 
+// version is injected via -ldflags "-X main.version=x.y.z" at build time.
+var version = "dev"
+
 func main() {
 	// Determine config path (default: ./config/config.yaml).
 	configPath := "config/config.yaml"
@@ -45,7 +48,7 @@ func main() {
 	defer db.Close()
 
 	// Initialize API server (wires collector, classifier, store).
-	srv, err := api.NewServer(db, cfg)
+	srv, err := api.NewServer(db, cfg, version)
 	if err != nil {
 		log.Fatalf("[main] failed to init server: %v", err)
 	}
