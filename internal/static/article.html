@@ -35,7 +35,7 @@
     </div>
   </main>
 
-  <div class="footer-copyright">AI News Hub v0.5.0 · 用心搭建 ⚡</div>
+  <div class="footer-copyright">AI News Hub v0.6.0 · 用心搭建 ⚡</div>
 
   <script>
     // --- Article Detail Page Logic ---
@@ -83,6 +83,14 @@
             contentHtml = '<div class="detail-summary">' + escapeHtml(a.summary) + '</div>';
           }
 
+          // 来源域名
+          let sourceDomain = '';
+          try {
+            sourceDomain = new URL(a.url).hostname;
+          } catch (e) {
+            sourceDomain = a.source || '';
+          }
+
           detailEl.innerHTML = `
             <div class="detail-card">
               <h1 class="detail-title">${escapeHtml(a.title)}</h1>
@@ -95,15 +103,121 @@
               </div>
               ${heroImg}
               ${contentHtml}
-              <a class="detail-cta" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">阅读原文 →</a>
+              <div class="detail-actions">
+                <button class="detail-cta detail-cta-primary" id="btnPreview" onclick="togglePreview()">
+                  📖 查看正文
+                </button>
+                <a class="detail-cta detail-cta-secondary" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">
+                  🔗 原文链接
+                </a>
+              </div>
+              <div class="content-preview" id="contentPreview" style="display:none;">
+                <div class="content-preview-header">
+                  <span>📖 正文预览</span>
+                  <span class="content-preview-source">来源: ${escapeHtml(sourceDomain)}</span>
+                </div>
+                <div class="content-preview-body" id="previewBody">
+                  <div class="loading-wrap" style="padding:40px 0;">
+                    <div class="spinner"></div>
+                    <p>正在提取正文…</p>
+                  </div>
+                </div>
+                <div class="content-preview-footer">
+                  ⚠️ 此内容由 AI 自动提取，如有错漏请以原文为准
+                </div>
+              </div>
             </div>
           `;
+
+          // Store article URL for preview
+          window._articleUrl = a.url;
+          window._previewLoaded = false;
+          window._previewOpen = false;
         })
         .catch(err => {
           detailEl.innerHTML = '<div class="error-state"><div class="error-icon">🔌</div><p>网络错误，请重试</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
           console.error('Article fetch error:', err);
         });
 
+      // --- Toggle preview ---
+      window.togglePreview = function() {
+        const preview = document.getElementById('contentPreview');
+        const btn = document.getElementById('btnPreview');
+        if (!preview || !btn) return;
+
+        if (window._previewOpen) {
+          // Close
+          preview.style.display = 'none';
+          btn.textContent = '📖 查看正文';
+          btn.disabled = false;
+          window._previewOpen = false;
+          return;
+        }
+
+        // Open
+        window._previewOpen = true;
+        preview.style.display = 'block';
+        preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        if (!window._previewLoaded) {
+          // Fetch content
+          btn.disabled = true;
+          btn.innerHTML = '<span class="btn-spinner"></span> 提取中…';
+
+          fetch(`${API_BASE}/articles/${encodeURIComponent(articleId)}/content`)
+            .then(res => res.json())
+            .then(data => {
+              const body = document.getElementById('previewBody');
+              if (!body) return;
+
+              if (data.error && data.html === undefined) {
+                body.innerHTML = '<div class="content-preview-error">正文提取失败，请直接访问原文</div>';
+                btn.textContent = '📖 查看正文';
+                btn.disabled = false;
+                return;
+              }
+
+              // Update source and timing info
+              const headerEl = preview.querySelector('.content-preview-header');
+              if (headerEl) {
+                let timingInfo = '';
+                if (data.fetch_time_ms > 0) {
+                  timingInfo = ` · 耗时: ${(data.fetch_time_ms / 1000).toFixed(1)}s`;
+                }
+                if (data.cached) {
+                  timingInfo += ' · 已缓存';
+                }
+                const existingSource = headerEl.querySelector('.content-preview-source');
+                if (existingSource) {
+                  existingSource.textContent = existingSource.textContent + timingInfo;
+                }
+              }
+
+              if (data.html && data.html.trim()) {
+                body.innerHTML = data.html;
+                window._previewLoaded = true;
+                btn.textContent = '收起正文';
+              } else {
+                body.innerHTML = '<div class="content-preview-error">未能提取到正文内容，请直接访问原文</div>';
+                btn.textContent = '📖 查看正文';
+              }
+              btn.disabled = false;
+            })
+            .catch(err => {
+              const body = document.getElementById('previewBody');
+              if (body) {
+                body.innerHTML = '<div class="content-preview-error">网络错误，请重试</div>';
+              }
+              btn.textContent = '📖 查看正文';
+              btn.disabled = false;
+              console.error('Content fetch error:', err);
+            });
+        } else {
+          btn.textContent = '收起正文';
+        }
+      };
+
+      // --- Utility functions ---
       function slugify(text) {
         return text.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
       }

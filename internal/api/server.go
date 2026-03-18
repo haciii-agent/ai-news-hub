@@ -65,7 +65,8 @@ func (s *Server) Handler() http.Handler {
 
 	// API v1 routes
 	mux.HandleFunc("/api/v1/articles", s.methodRouter(s.articlesHandler, s.articleDetailHandler))
-	mux.HandleFunc("/api/v1/articles/", s.methodRouter(nil, s.articleDetailHandler))
+	mux.HandleFunc("/api/v1/articles/", s.articlesPathRouter)
+	mux.HandleFunc("/api/v1/articles/", s.methodRouter(nil, s.HandleArticleContent))
 	mux.HandleFunc("/api/v1/categories", s.categoriesHandler)
 	mux.HandleFunc("/api/v1/collect", s.CollectSvc.HandleCollect)
 	mux.HandleFunc("/api/v1/collect/status", s.CollectSvc.HandleCollectStatus)
@@ -85,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  GET  /healthz")
 	log.Println("  GET  /api/v1/articles")
 	log.Println("  GET  /api/v1/articles/{id}")
+	log.Println("  GET  /api/v1/articles/{id}/content")
 	log.Println("  GET  /api/v1/categories")
 	log.Println("  POST /api/v1/collect")
 	log.Println("  GET  /api/v1/collect/status")
@@ -121,6 +123,23 @@ func (s *Server) methodRouter(listHandler, detailHandler http.HandlerFunc) http.
 
 		writeError(w, http.StatusNotFound, "resource not found")
 	}
+}
+
+// articlesPathRouter routes /api/v1/articles/... requests to the correct handler.
+// /api/v1/articles/{id} → articleDetailHandler
+// /api/v1/articles/{id}/content → HandleArticleContent
+func (s *Server) articlesPathRouter(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/articles/")
+	path = strings.TrimSuffix(path, "/")
+
+	// /api/v1/articles/{id}/content
+	if strings.HasSuffix(path, "/content") {
+		s.HandleArticleContent(w, r)
+		return
+	}
+
+	// /api/v1/articles/{id}
+	s.articleDetailHandler(w, r)
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {

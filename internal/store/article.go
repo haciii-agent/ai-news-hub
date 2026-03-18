@@ -41,6 +41,7 @@ type ArticleStore interface {
 	QueryArticles(filter ArticleFilter) ([]Article, int, error)
 	SearchArticles(query string, filter ArticleFilter) ([]Article, int, map[int64]string, error)
 	GetArticleByID(id int64) (*Article, error)
+	UpdateContentHTML(id int64, contentHTML string) error
 	GetCategoryStats() ([]CategoryStat, error)
 	GetLanguageCounts() (map[string]int, error)
 	DeleteArticlesBefore(before string) (int64, error)
@@ -274,6 +275,15 @@ func (s *articleStore) GetArticleByID(id int64) (*Article, error) {
 		return nil, fmt.Errorf("get article by id %d: %w", id, err)
 	}
 	return &a, nil
+}
+
+// UpdateContentHTML updates the content_html field for an article by ID.
+func (s *articleStore) UpdateContentHTML(id int64, contentHTML string) error {
+	_, err := s.db.Exec(`UPDATE articles SET content_html = ? WHERE id = ?`, contentHTML, id)
+	if err != nil {
+		return fmt.Errorf("update content_html for article %d: %w", id, err)
+	}
+	return nil
 }
 
 // GetCategoryStats returns article counts grouped by category.
