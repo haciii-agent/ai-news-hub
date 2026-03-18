@@ -153,12 +153,24 @@ func (c *HTMLCollector) collectOne(src Source) CollectResult {
 		return result
 	}
 
+	// 从页面提取 meta description/og:image 用于补充摘要和图片
+	metaDesc, metaImage := extractPageMeta(body)
+	baseURL, _ := url.Parse(src.URL)
+
 	// 统一填充元信息
 	for i := range articles {
 		articles[i].SourceName = src.Name
 		articles[i].SourceURL = src.URL
 		if articles[i].Language == "" {
 			articles[i].Language = src.Language
+		}
+		// 如果没有摘要，使用 meta description
+		if articles[i].Summary == "" && metaDesc != "" {
+			articles[i].Summary = cleanText(metaDesc)
+		}
+		// 如果没有图片，使用 og:image
+		if articles[i].ImageURL == "" && metaImage != "" {
+			articles[i].ImageURL = resolveURL(baseURL, metaImage)
 		}
 	}
 
@@ -618,4 +630,83 @@ func looksLikeArticleURL(link string) bool {
 		strings.Contains(link, "/news") ||
 		strings.Contains(link, ".html") ||
 		strings.Contains(link, "?p=")
+}
+
+// ---------------------------------------------------------------------------
+// Meta 提取 — 从 HTML 页面中提取 og:description / og:image 等元信息
+// ---------------------------------------------------------------------------
+
+// extractPageMeta 从 HTML 页面中提取 meta description 和主图。
+// 返回 (description, imageURL)。
+func extractPageMeta(body []byte) (desc, imageURL string) {
+	doc, err := html.Parse(bytes.NewReader(body))
+	if err != nil {
+		return "", ""
+	}
+
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "meta" {
+			prop := getAttr(n, "property")
+			name := getAttr(n, "name")
+			content := getAttr(n, "content")
+
+			switch {
+			case prop == "og:description" && desc == "":
+				desc = content
+			case name == "description" && desc == "":
+				desc = content
+			case prop == "og:image" && imageURL == "":
+				imageURL = content
+			case name == "twitter:image" && imageURL == "":
+				imageURL = content
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+
+	// 如果没有通过 meta 标签找到图片，尝试从第一个 <article> 中的 <img> 提取
+	if imageURL == "" {
+		imageURL = extractArticleImage(body)
+	}
+
+	return desc, imageURL
+}
+
+// extractArticleImage 从页面中第一个 <article> 元素内提取第一个 <img> 标签的 src。
+func extractArticleImage(body []byte) string {
+	doc, err := html.Parse(bytes.NewReader(body))
+	if err != nil {
+		return ""
+	}
+
+	var foundArticle bool
+	var imgSrc string
+
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if imgSrc != "" {
+			return // 已经找到了
+		}
+		if n.Type == html.ElementNode {
+			if !foundArticle && n.Data == "article" {
+				foundArticle = true
+			}
+			if foundArticle && n.Data == "img" {
+				imgSrc = getAttr(n, "src")
+				if imgSrc != "" && !strings.HasPrefix(imgSrc, "data:") {
+					return
+				}
+				imgSrc = "" // 跳过 data URI
+			}
+		}
+		for c := n.FirstChild; c != nil && imgSrc == ""; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+	return imgSrc
 }

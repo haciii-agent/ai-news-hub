@@ -39,6 +39,7 @@ type ArticleStore interface {
 	InsertArticle(article *Article) error
 	BatchInsertArticles(articles []Article) (inserted int, skipped int, err error)
 	QueryArticles(filter ArticleFilter) ([]Article, int, error)
+	SearchArticles(query string, filter ArticleFilter) ([]Article, int, map[int64]string, error)
 	GetArticleByID(id int64) (*Article, error)
 	GetCategoryStats() ([]CategoryStat, error)
 	GetLanguageCounts() (map[string]int, error)
@@ -334,6 +335,145 @@ func (s *articleStore) GetLanguageCounts() (map[string]int, error) {
 		counts[lang] = count
 	}
 	return counts, rows.Err()
+}
+
+// SearchArticles performs full-text search using FTS5 on title + summary.
+// Returns matched articles, total count, a map of article ID → highlighted snippet, and error.
+// Results are ordered by BM25 relevance. Supports category/language filters and pagination.
+// Empty query falls back to returning all articles (same as QueryArticles).
+func (s *articleStore) SearchArticles(query string, filter ArticleFilter) ([]Article, int, map[int64]string, error) {
+	// Sanitize defaults
+	if filter.Page < 1 {
+		filter.Page = 1
+	}
+	if filter.PerPage < 1 {
+		filter.PerPage = 20
+	}
+	if filter.PerPage > 100 {
+		filter.PerPage = 100
+	}
+
+	// Empty query → fall back to normal list
+	if strings.TrimSpace(query) == "" {
+		articles, total, err := s.QueryArticles(filter)
+		return articles, total, nil, err
+	}
+
+	// Sanitize FTS query: escape special characters
+	ftsQuery := sanitizeFTSQuery(query)
+
+	// Build WHERE conditions (JOIN on articles table for category/language filter)
+	var conditions []string
+	var args []interface{}
+
+	conditions = append(conditions, "articles_fts MATCH ?")
+	args = append(args, ftsQuery)
+
+	if filter.Category != "" {
+		conditions = append(conditions, "articles.category = ?")
+		args = append(args, filter.Category)
+	}
+	if filter.Language != "" {
+		conditions = append(conditions, "articles.language = ?")
+		args = append(args, filter.Language)
+	}
+
+	where := "WHERE " + strings.Join(conditions, " AND ")
+
+	// Total count
+	var total int
+	countSQL := "SELECT COUNT(*) FROM articles_fts JOIN articles ON articles_fts.rowid = articles.id " + where
+	if err := s.db.QueryRow(countSQL, args...).Scan(&total); err != nil {
+		return nil, 0, nil, fmt.Errorf("count search results: %w", err)
+	}
+
+	// Paginated results with BM25 ranking and snippet extraction
+	offset := (filter.Page - 1) * filter.PerPage
+	querySQL := fmt.Sprintf(
+		`SELECT articles.id, articles.title, articles.url, articles.source,
+		        COALESCE(articles.source_url,''), articles.category,
+		        COALESCE(articles.summary,''), COALESCE(articles.content_html,''),
+		        COALESCE(articles.image_url,''), articles.published_at,
+		        articles.collected_at, articles.language,
+		        snippet(articles_fts, 0, '<mark>', '</mark>', '...', 32)
+		 FROM articles_fts JOIN articles ON articles_fts.rowid = articles.id
+		 %s
+		 ORDER BY bm25(articles_fts)
+		 LIMIT ? OFFSET ?`, where)
+
+	qArgs := append(args, filter.PerPage, offset)
+	rows, err := s.db.Query(querySQL, qArgs...)
+	if err != nil {
+		return nil, 0, nil, fmt.Errorf("search articles: %w", err)
+	}
+	defer rows.Close()
+
+	snippets := make(map[int64]string)
+	var articles []Article
+	for rows.Next() {
+		var a Article
+		var snippet string
+		if err := rows.Scan(
+			&a.ID, &a.Title, &a.URL, &a.Source,
+			&a.SourceURL, &a.Category, &a.Summary,
+			&a.ContentHTML, &a.ImageURL, &a.PublishedAt,
+			&a.CollectedAt, &a.Language,
+			&snippet,
+		); err != nil {
+			return nil, 0, nil, fmt.Errorf("scan search result: %w", err)
+		}
+		// Strip HTML tags from snippet (from summary which may contain tags)
+		snippets[a.ID] = stripHTML(snippet)
+		articles = append(articles, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, nil, fmt.Errorf("iterate search results: %w", err)
+	}
+
+	return articles, total, snippets, nil
+}
+
+// sanitizeFTSQuery escapes FTS5 special characters to prevent query syntax errors.
+// Wraps each token in double quotes for safe phrase matching.
+func sanitizeFTSQuery(query string) string {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return query
+	}
+	// Escape double quotes in the query
+	query = strings.ReplaceAll(query, `"`, `""`)
+	// Split into tokens and join with OR for flexible matching
+	tokens := strings.Fields(query)
+	if len(tokens) == 0 {
+		return query
+	}
+	var parts []string
+	for _, t := range tokens {
+		if t != "" {
+			parts = append(parts, `"`+t+`"`)
+		}
+	}
+	return strings.Join(parts, " OR ")
+}
+
+// stripHTML removes all HTML tags from a string.
+func stripHTML(s string) string {
+	var result strings.Builder
+	inTag := false
+	for _, r := range s {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
 }
 
 // DeleteArticlesBefore deletes articles with collected_at before the given date string (YYYY-MM-DD).

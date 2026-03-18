@@ -146,6 +146,7 @@ func (s *CollectService) HandleCollect(w http.ResponseWriter, r *http.Request) {
 				SourceURL:   ca.SourceURL,
 				Category:    category.Category,
 				Summary:     ca.Summary,
+				ImageURL:    ca.ImageURL,
 				PublishedAt: publishedAt,
 				CollectedAt: startedAtStr,
 				Language:    ca.Language,

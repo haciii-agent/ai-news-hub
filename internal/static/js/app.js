@@ -1,4 +1,4 @@
-// AI News Hub v0.3.0 — 前端交互逻辑
+// AI News Hub v0.5.0 — 前端交互逻辑
 // Vanilla JS，调用后端 API 渲染数据
 (function () {
   'use strict';
@@ -16,6 +16,11 @@
   let isLoading = false;
   let categoryStats = {}; // { categoryName: count }
 
+  // Search state
+  let isSearchMode = false;
+  let searchDebounceTimer = null;
+  let currentSearchQuery = '';
+
   // --- DOM refs ---
   const articleListEl = document.getElementById('articleList');
   const loadMoreWrap = document.getElementById('loadMoreWrap');
@@ -25,6 +30,14 @@
   const categoryTabs = document.getElementById('categoryTabs');
   const collectStatusEl = document.getElementById('collectStatus');
   const headerClock = document.getElementById('headerClock');
+  const themeToggle = document.getElementById('themeToggle');
+
+  // Search DOM refs
+  const searchContainer = document.getElementById('searchContainer');
+  const searchToggle = document.getElementById('searchToggle');
+  const searchInputWrap = document.getElementById('searchInputWrap');
+  const searchInput = document.getElementById('searchInput');
+  const searchClear = document.getElementById('searchClear');
 
   // Stats bar elements
   const statTotal = document.getElementById('statTotal');
@@ -55,11 +68,48 @@
   init();
 
   async function init() {
+    initTheme();
     bindEvents();
     startClock();
     await loadStats();
     await loadCategories();
-    await loadArticles();
+
+    // Check URL params for pre-filled search
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlSearch = urlParams.get('search');
+    if (urlSearch && urlSearch.trim()) {
+      currentSearchQuery = urlSearch.trim();
+      openSearchInput();
+      searchInput.value = currentSearchQuery;
+      searchClear.style.display = '';
+      enterSearchMode();
+      await performSearch(currentSearchQuery);
+    } else {
+      await loadArticles();
+    }
+  }
+
+  // --- Theme Toggle ---
+  function initTheme() {
+    const saved = localStorage.getItem('theme');
+    if (saved) {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+    updateThemeIcon();
+  }
+
+  function updateThemeIcon() {
+    if (!themeToggle) return;
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    themeToggle.textContent = isLight ? '☀️' : '🌙';
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    updateThemeIcon();
   }
 
   // --- Real-time Clock ---
@@ -80,6 +130,11 @@
 
   // --- Events ---
   function bindEvents() {
+    // Theme toggle
+    if (themeToggle) {
+      themeToggle.addEventListener('click', toggleTheme);
+    }
+
     // Language switcher
     langSwitcher.addEventListener('click', function (e) {
       const btn = e.target.closest('.lang-btn');
@@ -90,15 +145,262 @@
 
       currentLang = btn.dataset.lang;
       currentPage = 1;
-      loadArticles();
+      if (isSearchMode) {
+        performSearch(currentSearchQuery);
+      } else {
+        loadArticles();
+      }
     });
 
     // Load more
     loadMoreBtn.addEventListener('click', function () {
       if (isLoading || currentPage >= totalPages) return;
       currentPage++;
-      loadArticles(true);
+      if (isSearchMode) {
+        performSearch(currentSearchQuery, true);
+      } else {
+        loadArticles(true);
+      }
     });
+
+    // --- Search events ---
+    // Toggle search input open/close
+    if (searchToggle) {
+      searchToggle.addEventListener('click', function () {
+        if (isSearchInputOpen()) {
+          closeSearchInput();
+          if (isSearchMode) {
+            exitSearch();
+          }
+        } else {
+          openSearchInput();
+          searchInput.focus();
+        }
+      });
+    }
+
+    // Search input with debounce
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        const query = searchInput.value.trim();
+        searchClear.style.display = query ? '' : 'none';
+
+        if (searchDebounceTimer) {
+          clearTimeout(searchDebounceTimer);
+        }
+
+        if (!query) {
+          exitSearch();
+          return;
+        }
+
+        searchDebounceTimer = setTimeout(function () {
+          currentSearchQuery = query;
+          enterSearchMode();
+          performSearch(query);
+        }, 300);
+      });
+
+      // ESC to exit search
+      searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          searchInput.value = '';
+          searchClear.style.display = 'none';
+          closeSearchInput();
+          if (isSearchMode) {
+            exitSearch();
+          }
+        }
+      });
+    }
+
+    // Clear search button
+    if (searchClear) {
+      searchClear.addEventListener('click', function () {
+        searchInput.value = '';
+        searchClear.style.display = 'none';
+        closeSearchInput();
+        if (isSearchMode) {
+          exitSearch();
+        }
+      });
+    }
+
+    // Keyboard shortcut: "/" to focus search (when not in an input)
+    document.addEventListener('keydown', function (e) {
+      if (e.key === '/' && !isSearchInputOpen()) {
+        const tag = document.activeElement.tagName.toLowerCase();
+        if (tag !== 'input' && tag !== 'textarea' && !document.activeElement.isContentEditable) {
+          e.preventDefault();
+          openSearchInput();
+          searchInput.focus();
+        }
+      }
+    });
+  }
+
+  // --- Search functions ---
+  function openSearchInput() {
+    if (searchContainer) searchContainer.classList.add('search-open');
+  }
+
+  function closeSearchInput() {
+    if (searchContainer) searchContainer.classList.remove('search-open');
+    if (searchInput) searchInput.blur();
+  }
+
+  function isSearchInputOpen() {
+    return searchContainer && searchContainer.classList.contains('search-open');
+  }
+
+  function enterSearchMode() {
+    if (!isSearchMode) {
+      isSearchMode = true;
+      document.body.classList.add('search-mode');
+    }
+  }
+
+  function exitSearch() {
+    isSearchMode = false;
+    currentSearchQuery = '';
+    document.body.classList.remove('search-mode');
+    searchDebounceTimer = null;
+    currentPage = 1;
+    loadArticles();
+  }
+
+  async function performSearch(query, append) {
+    if (isLoading) return;
+    isLoading = true;
+
+    if (!append) {
+      articleListEl.innerHTML = renderSkeletons(4);
+      loadMoreWrap.style.display = 'none';
+      statsFooter.textContent = '';
+    } else {
+      loadMoreBtn.disabled = true;
+      loadMoreBtn.classList.add('loading');
+      loadMoreBtn.textContent = '搜索中';
+    }
+
+    try {
+      var params = new URLSearchParams({
+        page: currentPage,
+        per_page: PER_PAGE,
+        search: query,
+      });
+
+      if (currentCategory) params.set('category', currentCategory);
+      if (currentLang !== 'all') params.set('language', currentLang);
+
+      var res = await fetch(API_BASE + '/articles?' + params);
+      var data = await res.json();
+
+      if (data.error) {
+        if (!append) {
+          articleListEl.innerHTML = renderErrorState(data.message);
+        }
+        return;
+      }
+
+      var articles = data.articles || [];
+      var snippets = data.snippets || {};
+      totalPages = data.total_pages || 1;
+      totalArticles = data.total || 0;
+
+      if (append) {
+        if (articles.length > 0) {
+          articleListEl.insertAdjacentHTML('beforeend', renderSearchResults(articles, snippets, (currentPage - 1) * PER_PAGE));
+        }
+      } else {
+        if (articles.length === 0) {
+          articleListEl.innerHTML = renderSearchEmptyState(query);
+        } else {
+          articleListEl.innerHTML = renderSearchResults(articles, snippets, 0);
+        }
+      }
+
+      // Load more button
+      if (currentPage < totalPages) {
+        loadMoreWrap.style.display = '';
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.classList.remove('loading');
+        loadMoreBtn.textContent = '加载更多搜索结果';
+      } else {
+        loadMoreWrap.style.display = 'none';
+      }
+
+      // Stats footer — search mode indicator
+      if (totalArticles > 0) {
+        statsFooter.innerHTML = '<span class="search-mode-indicator">🔍 搜索结果 · 共 ' + totalArticles + ' 条</span>';
+      }
+
+    } catch (err) {
+      console.error('Search error:', err);
+      if (!append) {
+        articleListEl.innerHTML = renderErrorState(null);
+      }
+    } finally {
+      isLoading = false;
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.classList.remove('loading');
+    }
+  }
+
+  // --- Render search results ---
+  function renderSearchResults(articles, snippets, startIndex) {
+    return articles.map(function (a, i) {
+      var rank = startIndex + i + 1;
+      var catClass = CATEGORY_COLORS[a.category] || 'tag-unknown';
+      var langClass = a.language === 'zh' ? 'zh' : 'en';
+      var langLabel = a.language === 'zh' ? '🇨🇳' : '🇬🇧';
+      var timeStr = formatTime(a.published_at || a.collected_at);
+      var detailHref = '/article.html?id=' + a.id;
+      var category = a.category || '未分类';
+
+      // Snippet with <mark> highlights (already HTML-safe from backend)
+      var snippetText = snippets[a.id] || '';
+      // If snippet is empty, use summary (truncated) without highlights
+      var summaryHtml = '';
+      if (snippetText) {
+        summaryHtml = '<p class="card-summary card-snippet">' + snippetText + '</p>';
+      } else if (a.summary) {
+        summaryHtml = '<p class="card-summary">' + escapeHtml(a.summary) + '</p>';
+      }
+
+      // Thumbnail
+      var thumbnailHtml = '';
+      if (a.image_url) {
+        thumbnailHtml = '<div class="card-thumbnail"><img src="' + escapeAttr(a.image_url) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
+      }
+
+      return '<div class="article-card" data-category="' + escapeAttr(category) + '">'
+        + '<div class="card-rank">' + rank + '</div>'
+        + thumbnailHtml
+        + '<div class="card-body">'
+        + '<div class="card-title-row">'
+        + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
+        + '<a class="card-url-link" href="' + escapeAttr(a.url) + '" target="_blank" rel="noopener" title="原文链接">🔗</a>'
+        + '</div>'
+        + summaryHtml
+        + '<div class="card-meta">'
+        + '<span class="card-source">' + escapeHtml(a.source) + '</span>'
+        + '<span class="card-dot">·</span>'
+        + '<span class="card-time">' + timeStr + '</span>'
+        + '<span class="card-lang ' + langClass + '">' + langLabel + '</span>'
+        + '<span class="tag ' + catClass + '">' + escapeHtml(category) + '</span>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function renderSearchEmptyState(query) {
+    return '<div class="empty-state">'
+      + '<div class="empty-icon">🔍</div>'
+      + '<p>未找到 "<strong>' + escapeHtml(query) + '</strong>" 相关结果</p>'
+      + '<p class="empty-sub">尝试使用不同的关键词搜索</p>'
+      + '</div>';
   }
 
   // --- Load Stats ---
@@ -196,7 +498,11 @@
 
       currentCategory = tab.dataset.category;
       currentPage = 1;
-      loadArticles();
+      if (isSearchMode) {
+        performSearch(currentSearchQuery);
+      } else {
+        loadArticles();
+      }
 
       // Smooth scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -293,8 +599,15 @@
       var summary = a.summary ? escapeHtml(a.summary) : '';
       var category = a.category || '未分类';
 
+      // Thumbnail
+      var thumbnailHtml = '';
+      if (a.image_url) {
+        thumbnailHtml = '<div class="card-thumbnail"><img src="' + escapeAttr(a.image_url) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
+      }
+
       return '<div class="article-card" data-category="' + escapeAttr(category) + '">'
         + '<div class="card-rank">' + rank + '</div>'
+        + thumbnailHtml
         + '<div class="card-body">'
         + '<div class="card-title-row">'
         + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'

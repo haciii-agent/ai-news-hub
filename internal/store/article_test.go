@@ -156,15 +156,15 @@ func TestDeleteArticlesBefore(t *testing.T) {
 
 	s := NewArticleStore(db)
 
-	now := "2026-03-17T12:00:00Z"
-	old := "2026-01-01T00:00:00Z"
-
-	articles := []Article{
-		{Title: "Old 1", URL: "http://a.com/1", Source: "test", Category: "AI", Language: "en", PublishedAt: &old},
-		{Title: "Old 2", URL: "http://a.com/2", Source: "test", Category: "AI", Language: "en", PublishedAt: &old},
-		{Title: "New 1", URL: "http://a.com/3", Source: "test", Category: "AI", Language: "en", PublishedAt: &now},
-	}
-	_, _, err := s.BatchInsertArticles(articles)
+	// Insert articles with explicit collected_at using raw SQL
+	// so DeleteArticlesBefore can filter by date correctly
+	_, err := db.Exec(`
+		INSERT INTO articles (title, url, source, category, language, collected_at)
+		VALUES
+		('Old 1', 'http://a.com/1', 'test', 'AI', 'en', '2026-01-01 00:00:00'),
+		('Old 2', 'http://a.com/2', 'test', 'AI', 'en', '2026-01-15 00:00:00'),
+		('New 1', 'http://a.com/3', 'test', 'AI', 'en', '2026-03-17 12:00:00')
+	`)
 	if err != nil {
 		t.Fatalf("seed error: %v", err)
 	}
@@ -178,8 +178,8 @@ func TestDeleteArticlesBefore(t *testing.T) {
 		t.Fatalf("expected 3 articles, got %d", total)
 	}
 
-	// Delete articles collected before 2026-03-17
-	deleted, err := s.DeleteArticlesBefore("2026-03-17")
+	// Delete articles collected before 2026-03-01
+	deleted, err := s.DeleteArticlesBefore("2026-03-01")
 	if err != nil {
 		t.Fatalf("DeleteArticlesBefore error: %v", err)
 	}

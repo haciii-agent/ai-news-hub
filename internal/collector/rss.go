@@ -26,6 +26,7 @@ type Article struct {
 	Title       string `json:"title"`
 	URL         string `json:"url"`
 	Summary     string `json:"summary,omitempty"`
+	ImageURL    string `json:"image_url,omitempty"`
 	PublishedAt string `json:"published_at,omitempty"`
 	SourceName  string `json:"source_name"`
 	SourceURL   string `json:"source_url"`
@@ -62,6 +63,14 @@ type rssItem struct {
 	Description string `xml:"description"`
 	PubDate     string `xml:"pubDate"`
 	GUID        string `xml:"guid"`
+	Enclosure   struct {
+		URL  string `xml:"url,attr"`
+		Type string `xml:"type,attr"`
+	} `xml:"enclosure"`
+	MediaContent []struct {
+		URL  string `xml:"url,attr"`
+		Type string `xml:"type,attr"`
+	} `xml:"http://search.yahoo.com/mrss/ content"`
 }
 
 // atomFeed 表示 Atom 格式。
@@ -308,6 +317,7 @@ func (c *RSSCollector) convertRSSItems(items []rssItem, src Source) []Article {
 			Title:       cleanText(item.Title),
 			URL:         url,
 			Summary:     cleanHTML(item.Description),
+			ImageURL:    extractRSSImage(item),
 			PublishedAt: parseTime(item.PubDate),
 			SourceName:  src.Name,
 			SourceURL:   src.URL,
@@ -341,19 +351,23 @@ func (c *RSSCollector) convertAtomEntries(entries []atomEntry, src Source) []Art
 			continue
 		}
 
-		summary := entry.Summary
+		summary := entry.Content
 		if summary == "" {
-			summary = entry.Content
+			summary = entry.Summary
 		}
 		published := entry.Published
 		if published == "" {
 			published = entry.Updated
 		}
 
+		// Extract image from Atom enclosure links
+		imageURL := extractAtomImage(entry)
+
 		articles = append(articles, Article{
 			Title:       cleanText(entry.Title),
 			URL:         url,
 			Summary:     cleanHTML(summary),
+			ImageURL:    imageURL,
 			PublishedAt: parseTime(published),
 			SourceName:  src.Name,
 			SourceURL:   src.URL,
@@ -381,7 +395,7 @@ func cleanText(s string) string {
 	return s
 }
 
-// cleanHTML 去除简单 HTML 标签，返回纯文本摘要（截取前 500 字符）。
+// cleanHTML 去除简单 HTML 标签，返回纯文本摘要（截取前 2000 字符）。
 func cleanHTML(s string) string {
 	var result strings.Builder
 	inTag := false
@@ -398,8 +412,8 @@ func cleanHTML(s string) string {
 		}
 	}
 	text := cleanText(result.String())
-	if len(text) > 500 {
-		text = text[:500] + "..."
+	if len(text) > 2000 {
+		text = text[:2000] + "..."
 	}
 	return text
 }
@@ -430,4 +444,87 @@ func parseTime(s string) string {
 		}
 	}
 	return s
+}
+
+// extractRSSImage 从 RSS 2.0 item 中提取图片 URL。
+// 优先级：enclosure（image type）> media:content（image type）> description 中的第一个 <img>。
+func extractRSSImage(item rssItem) string {
+	// 1. enclosure
+	if item.Enclosure.URL != "" && isImageMIME(item.Enclosure.Type) {
+		return item.Enclosure.URL
+	}
+	// 2. media:content
+	for _, mc := range item.MediaContent {
+		if mc.URL != "" && isImageMIME(mc.Type) {
+			return mc.URL
+		}
+	}
+	// 3. 从 description 中提取第一个 img 标签
+	if item.Description != "" {
+		if imgURL := extractFirstImgURL(item.Description); imgURL != "" {
+			return imgURL
+		}
+	}
+	return ""
+}
+
+// extractAtomImage 从 Atom entry 的 link 中提取 enclosure 图片。
+func extractAtomImage(entry atomEntry) string {
+	for _, link := range entry.Link {
+		if link.Rel == "enclosure" && link.Href != "" {
+			if strings.HasSuffix(strings.ToLower(link.Href), ".jpg") ||
+				strings.HasSuffix(strings.ToLower(link.Href), ".jpeg") ||
+				strings.HasSuffix(strings.ToLower(link.Href), ".png") ||
+				strings.HasSuffix(strings.ToLower(link.Href), ".webp") ||
+				strings.HasSuffix(strings.ToLower(link.Href), ".gif") {
+				return link.Href
+			}
+		}
+	}
+	// 从 content 中提取第一个 img
+	if entry.Content != "" {
+		if imgURL := extractFirstImgURL(entry.Content); imgURL != "" {
+			return imgURL
+		}
+	}
+	if entry.Summary != "" {
+		if imgURL := extractFirstImgURL(entry.Summary); imgURL != "" {
+			return imgURL
+		}
+	}
+	return ""
+}
+
+// isImageMIME 检查 MIME 类型是否为图片。
+func isImageMIME(mime string) bool {
+	return strings.HasPrefix(mime, "image/")
+}
+
+// extractFirstImgURL 从 HTML 字符串中提取第一个 <img> 标签的 src。
+func extractFirstImgURL(htmlStr string) string {
+	srcIdx := strings.Index(htmlStr, `<img`)
+	if srcIdx == -1 {
+		return ""
+	}
+	rest := htmlStr[srcIdx:]
+	srcStart := strings.Index(rest, `src="`)
+	if srcStart == -1 {
+		srcStart = strings.Index(rest, `src='`)
+		if srcStart == -1 {
+			return ""
+		}
+		srcStart += 5
+		quote := byte('\'')
+		endIdx := strings.IndexByte(rest[srcStart:], quote)
+		if endIdx == -1 {
+			return ""
+		}
+		return rest[srcStart : srcStart+endIdx]
+	}
+	srcStart += 5
+	endIdx := strings.IndexByte(rest[srcStart:], '"')
+	if endIdx == -1 {
+		return ""
+	}
+	return rest[srcStart : srcStart+endIdx]
 }

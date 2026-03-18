@@ -20,6 +20,14 @@
     </div>
     <div class="header-right">
       <div class="collect-status-badge never_run" id="collectStatus" style="display:none;"></div>
+      <div class="search-container" id="searchContainer">
+        <button class="search-toggle" id="searchToggle" title="搜索新闻 (/)">🔍</button>
+        <div class="search-input-wrap" id="searchInputWrap">
+          <input type="text" class="search-input" id="searchInput" placeholder="搜索新闻..." autocomplete="off">
+          <button class="search-clear" id="searchClear" title="清除搜索" style="display:none;">✕</button>
+        </div>
+      </div>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
       <div class="lang-switcher" id="langSwitcher">
         <button class="lang-btn active" data-lang="all">全部</button>
         <button class="lang-btn" data-lang="zh">中文</button>
@@ -63,7 +71,7 @@
     </div>
 
     <div id="statsFooter" class="stats-footer"></div>
-    <div class="footer-copyright">AI News Hub v0.3.0 · Built with ⚡</div>
+    <div class="footer-copyright">AI News Hub v0.5.0 · 用心搭建 ⚡</div>
   </main>
 
   <script src="js/app.js"></script>

@@ -1,5 +1,5 @@
 /* ============================================
-   AI News Hub v0.3.0 — 样式表
+   AI News Hub v0.5.0 — 样式表
    深色模式为主，参考 Product Hunt / 少数派风格
    ============================================ */
 
@@ -40,6 +40,18 @@
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --max-width: 900px;
   --header-height: 60px;
+  --card-title-color: #fff;
+  --scrollbar-track: var(--bg);
+  --scrollbar-thumb: #333350;
+  --scrollbar-thumb-hover: #444460;
+  --header-border: rgba(233, 69, 96, 0.2);
+  --header-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+  --lang-bg: rgba(255, 255, 255, 0.06);
+  --lang-border: rgba(255, 255, 255, 0.08);
+  --lang-color: rgba(255, 255, 255, 0.5);
+  --lang-hover: rgba(255, 255, 255, 0.85);
+  --skeleton-bg: var(--border);
+  --image-placeholder-bg: var(--border);
 
   /* 分类独立配色 (8种) */
   --cat-ai_ml: #e94560;
@@ -58,6 +70,67 @@
   --cat-product-bg: rgba(72, 191, 227, 0.12);
   --cat-general: #8d99ae;
   --cat-general-bg: rgba(141, 153, 174, 0.12);
+}
+
+/* --- Light Theme --- */
+[data-theme="light"] {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --header-bg: #ffffff;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --border: #e5e5ea;
+  --border-hover: #d1d1d6;
+  --accent: #e94560;
+  --accent-glow: rgba(233, 69, 96, 0.15);
+  --accent-hover: #d63550;
+  --link: #e94560;
+  --link-hover: #d63550;
+  --success: #34c759;
+  --success-bg: rgba(52, 199, 89, 0.1);
+  --warning: #ff9500;
+  --warning-bg: rgba(255, 149, 0, 0.1);
+  --error: #ff3b30;
+  --error-bg: rgba(255, 59, 48, 0.1);
+  --info-bg: rgba(0, 0, 0, 0.03);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --card-title-color: #1d1d1f;
+  --scrollbar-track: #f0f0f2;
+  --scrollbar-thumb: #c7c7cc;
+  --scrollbar-thumb-hover: #aeaeb2;
+  --header-border: rgba(0, 0, 0, 0.08);
+  --header-shadow: 0 1px 0 rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --lang-bg: rgba(0, 0, 0, 0.04);
+  --lang-border: rgba(0, 0, 0, 0.08);
+  --lang-color: rgba(0, 0, 0, 0.45);
+  --lang-hover: rgba(0, 0, 0, 0.75);
+  --skeleton-bg: #e5e5ea;
+  --image-placeholder-bg: #e5e5ea;
+
+  --cat-ai_ml-bg: rgba(233, 69, 96, 0.08);
+  --cat-tech-bg: rgba(78, 168, 222, 0.08);
+  --cat-biz-bg: rgba(244, 132, 95, 0.08);
+  --cat-oss-bg: rgba(87, 204, 153, 0.08);
+  --cat-research-bg: rgba(199, 125, 255, 0.08);
+  --cat-policy-bg: rgba(176, 137, 104, 0.08);
+  --cat-product-bg: rgba(72, 191, 227, 0.08);
+  --cat-general-bg: rgba(141, 153, 174, 0.08);
+}
+
+/* --- Theme transition --- */
+body,
+.header,
+.article-card,
+.detail-card,
+.cat-tab,
+.lang-switcher,
+.load-more-btn,
+.detail-back,
+.stats-bar,
+.skeleton-card {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 html {
@@ -93,16 +166,16 @@ a:hover {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333350;
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #444460;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* ============================
@@ -119,8 +192,8 @@ a:hover {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
-  border-bottom: 1px solid rgba(233, 69, 96, 0.2);
+  box-shadow: var(--header-shadow);
+  border-bottom: 1px solid var(--header-border);
 }
 
 .header-left {
@@ -132,7 +205,7 @@ a:hover {
 .header-logo {
   font-size: 1.2rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-primary);
   letter-spacing: -0.5px;
   white-space: nowrap;
   display: flex;
@@ -207,16 +280,16 @@ a:hover {
 .lang-switcher {
   display: flex;
   gap: 2px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--lang-bg);
   border-radius: 20px;
   padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--lang-border);
 }
 
 .lang-btn {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--lang-color);
   font-size: 0.78rem;
   padding: 5px 14px;
   border-radius: 16px;
@@ -226,7 +299,7 @@ a:hover {
 }
 
 .lang-btn:hover {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--lang-hover);
 }
 
 .lang-btn.active {
@@ -234,6 +307,166 @@ a:hover {
   color: #fff;
   font-weight: 600;
   box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* --- Theme Toggle --- */
+.theme-toggle {
+  background: var(--lang-bg);
+  border: 1px solid var(--lang-border);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 1;
+  padding: 0;
+}
+
+.theme-toggle:hover {
+  background: var(--lang-hover);
+  color: var(--text-primary);
+  transform: rotate(15deg);
+}
+
+/* ============================
+   Search — 搜索框
+   ============================ */
+.search-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.search-toggle {
+  background: var(--lang-bg);
+  border: 1px solid var(--lang-border);
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.search-toggle:hover {
+  background: var(--lang-hover);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  width: 0;
+  opacity: 0;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s ease,
+              margin 0.35s ease;
+  margin-left: 0;
+}
+
+.search-container.search-open .search-input-wrap {
+  width: 220px;
+  opacity: 1;
+  margin-left: 8px;
+}
+
+.search-input {
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  padding: 7px 32px 7px 12px;
+  border-radius: 20px;
+  outline: none;
+  width: 100%;
+  font-family: var(--font-sans);
+  transition: border-color 0.25s, box-shadow 0.25s;
+  height: 36px;
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search-clear {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  position: absolute;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.search-clear:hover {
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+
+/* Search mode indicator */
+.search-mode-indicator {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Snippet highlight in search results */
+.card-snippet mark {
+  background: var(--accent-glow);
+  color: var(--accent);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Search link on detail page */
+.search-link-detail {
+  background: var(--lang-bg);
+  border: 1px solid var(--lang-border);
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.search-link-detail:hover {
+  background: var(--lang-hover);
+  color: var(--text-primary);
+  transform: scale(1.1);
+  text-decoration: none;
 }
 
 /* ============================
@@ -422,6 +655,33 @@ a:hover {
   min-width: 0;
 }
 
+/* --- Card Thumbnail Image --- */
+.card-thumbnail {
+  width: 100px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--image-placeholder-bg);
+}
+
+.card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-thumbnail .img-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  opacity: 0.3;
+}
+
 .card-title-row {
   display: flex;
   align-items: flex-start;
@@ -431,7 +691,7 @@ a:hover {
 .card-title {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--card-title-color);
   line-height: 1.45;
   flex: 1;
   min-width: 0;
@@ -466,7 +726,7 @@ a:hover {
   line-height: 1.6;
   margin-top: 6px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -504,13 +764,13 @@ a:hover {
 }
 
 .card-lang.zh {
-  background: rgba(255, 255, 255, 0.08);
-  color: #90caf9;
+  background: rgba(100, 180, 255, 0.1);
+  color: #42a5f5;
 }
 
 .card-lang.en {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ce93d8;
+  background: rgba(186, 104, 200, 0.1);
+  color: #ab47bc;
 }
 
 /* --- Category Tags (pill) --- */
@@ -735,7 +995,7 @@ a:hover {
   font-weight: 800;
   line-height: 1.35;
   margin-bottom: 20px;
-  color: #fff;
+  color: var(--card-title-color);
   letter-spacing: -0.3px;
 }
 
@@ -768,6 +1028,16 @@ a:hover {
 
 .detail-content p {
   margin-bottom: 14px;
+}
+
+/* --- Detail Hero Image --- */
+.detail-hero-image {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 24px;
+  background: var(--image-placeholder-bg);
 }
 
 .detail-summary {
@@ -816,7 +1086,7 @@ a:hover {
 .skeleton-rank {
   width: 32px;
   height: 18px;
-  background: var(--border);
+  background: var(--skeleton-bg);
   border-radius: 4px;
 }
 
@@ -826,7 +1096,7 @@ a:hover {
 
 .skeleton-title {
   height: 18px;
-  background: var(--border);
+  background: var(--skeleton-bg);
   border-radius: 4px;
   margin-bottom: 10px;
   width: 75%;
@@ -834,7 +1104,7 @@ a:hover {
 
 .skeleton-summary {
   height: 14px;
-  background: var(--border);
+  background: var(--skeleton-bg);
   border-radius: 4px;
   margin-bottom: 8px;
   width: 100%;
@@ -847,7 +1117,7 @@ a:hover {
 
 .skeleton-meta {
   height: 14px;
-  background: var(--border);
+  background: var(--skeleton-bg);
   border-radius: 4px;
   margin-top: 12px;
   width: 45%;
@@ -881,6 +1151,11 @@ a:hover {
 
   .header-clock {
     display: none;
+  }
+
+  /* Search responsive */
+  .search-container.search-open .search-input-wrap {
+    width: 160px;
   }
 
   .lang-btn {
@@ -921,6 +1196,12 @@ a:hover {
   .card-rank {
     font-size: 0.95rem;
     min-width: 26px;
+  }
+
+  .card-thumbnail {
+    width: 72px;
+    height: 54px;
+    flex-shrink: 0;
   }
 
   .card-title {

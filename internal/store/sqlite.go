@@ -43,6 +43,32 @@ CREATE TABLE IF NOT EXISTS collect_runs (
 );
 `
 
+// ftsSQL creates the FTS5 virtual table and triggers for automatic sync.
+var ftsSQL = `
+-- FTS5 全文搜索虚拟表（content= 表示外部内容表，避免数据冗余）
+CREATE VIRTUAL TABLE IF NOT EXISTS articles_fts USING fts5(
+    title, summary, content='articles',
+    content_rowid='id',
+    tokenize='unicode61'
+);
+
+-- INSERT 触发器：文章插入后同步到 FTS
+CREATE TRIGGER IF NOT EXISTS articles_fts_insert AFTER INSERT ON articles BEGIN
+    INSERT INTO articles_fts(rowid, title, summary) VALUES (new.id, new.title, COALESCE(new.summary, ''));
+END;
+
+-- DELETE 触发器：文章删除后同步删除 FTS 记录
+CREATE TRIGGER IF NOT EXISTS articles_fts_delete AFTER DELETE ON articles BEGIN
+    INSERT INTO articles_fts(articles_fts, rowid, title, summary) VALUES('delete', old.id, old.title, COALESCE(old.summary, ''));
+END;
+
+-- UPDATE 触发器：文章更新后同步 FTS 记录
+CREATE TRIGGER IF NOT EXISTS articles_fts_update AFTER UPDATE ON articles BEGIN
+    INSERT INTO articles_fts(articles_fts, rowid, title, summary) VALUES('delete', old.id, old.title, COALESCE(old.summary, ''));
+    INSERT INTO articles_fts(rowid, title, summary) VALUES (new.id, new.title, COALESCE(new.summary, ''));
+END;
+`
+
 // NewDB opens (or creates) a SQLite database at dbPath, runs migrations,
 // and returns the *sql.DB handle.
 func NewDB(dbPath string) (*sql.DB, error) {
@@ -71,6 +97,35 @@ func NewDB(dbPath string) (*sql.DB, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec(schemaSQL)
-	return err
+	// 1. Create base tables
+	if _, err := db.Exec(schemaSQL); err != nil {
+		return fmt.Errorf("exec schema: %w", err)
+	}
+
+	// 2. Create FTS5 table and triggers
+	if _, err := db.Exec(ftsSQL); err != nil {
+		return fmt.Errorf("exec fts: %w", err)
+	}
+
+	// 3. Backfill existing articles into FTS index (if any)
+	//    This handles the case where articles exist before FTS was added.
+	var articleCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM articles").Scan(&articleCount); err != nil {
+		return fmt.Errorf("count articles for fts backfill: %w", err)
+	}
+	if articleCount > 0 {
+		result, err := db.Exec(
+			`INSERT INTO articles_fts(rowid, title, summary)
+			 SELECT id, title, summary FROM articles
+			 WHERE id NOT IN (SELECT rowid FROM articles_fts)`,
+		)
+		if err != nil {
+			return fmt.Errorf("fts backfill: %w", err)
+		}
+		if rowsAffected, _ := result.RowsAffected(); rowsAffected > 0 {
+			log.Printf("[store] FTS backfill: indexed %d existing articles", rowsAffected)
+		}
+	}
+
+	return nil
 }

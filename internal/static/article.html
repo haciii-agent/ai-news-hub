@@ -17,6 +17,10 @@
         <span>AI News <span class="logo-text-accent">Hub</span></span>
       </a>
     </div>
+    <div class="header-right">
+      <a href="/?search=" class="search-link-detail" id="searchLink" title="搜索新闻">🔍</a>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    </div>
   </header>
 
   <!-- Article Detail -->
@@ -31,7 +35,7 @@
     </div>
   </main>
 
-  <div class="footer-copyright">AI News Hub v0.3.0 · Built with ⚡</div>
+  <div class="footer-copyright">AI News Hub v0.5.0 · 用心搭建 ⚡</div>
 
   <script>
     // --- Article Detail Page Logic ---
@@ -67,11 +71,16 @@
           const langLabel = a.language === 'zh' ? '🇨🇳 中文' : '🇬🇧 EN';
           const timeStr = formatTime(a.published_at || a.collected_at);
 
+          let heroImg = '';
+          if (a.image_url) {
+            heroImg = '<img class="detail-hero-image" src="' + escapeHtml(a.image_url) + '" alt="' + escapeHtml(a.title) + '" loading="lazy" onerror="this.style.display=\'none\'">';
+          }
+
           let contentHtml = '';
           if (a.content_html) {
-            contentHtml = `<div class="detail-content">${a.content_html}</div>`;
+            contentHtml = '<div class="detail-content">' + a.content_html + '</div>';
           } else if (a.summary) {
-            contentHtml = `<div class="detail-summary">${escapeHtml(a.summary)}</div>`;
+            contentHtml = '<div class="detail-summary">' + escapeHtml(a.summary) + '</div>';
           }
 
           detailEl.innerHTML = `
@@ -84,6 +93,7 @@
                 <span class="card-lang ${langClass}">${langLabel}</span>
                 <span class="tag ${catClass}">${escapeHtml(a.category || '未分类')}</span>
               </div>
+              ${heroImg}
               ${contentHtml}
               <a class="detail-cta" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">阅读原文 →</a>
             </div>
@@ -120,6 +130,29 @@
           return dateStr;
         }
       }
+
+      // Theme toggle
+      (function() {
+        const saved = localStorage.getItem('theme');
+        if (saved) {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+        const btn = document.getElementById('themeToggle');
+        if (btn) {
+          function updateIcon() {
+            var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+            btn.textContent = isLight ? '☀️' : '🌙';
+          }
+          updateIcon();
+          btn.addEventListener('click', function() {
+            var current = document.documentElement.getAttribute('data-theme');
+            var next = current === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateIcon();
+          });
+        }
+      })();
     })();
   </script>
 </body>

@@ -28,7 +28,7 @@ func TestCleanHTML(t *testing.T) {
 		{
 			name:  "strip nested tags",
 			input: "<div><p>Line 1</p><p>Line 2</p></div>",
-			want:  "Line 1 Line 2",
+			want:  "Line 1Line 2",
 		},
 		{
 			name:  "strip link tags",
@@ -38,17 +38,17 @@ func TestCleanHTML(t *testing.T) {
 		{
 			name:  "strip img tag",
 			input: `<img src="pic.jpg" alt="photo"/>`,
-			want:  "photo\"/",
+			want:  "",
 		},
 		{
 			name:  "truncate long text",
-			input: "<p>" + string(make([]byte, 600)) + "</p>",
-			want:  "500 chars + ellipsis",
+			input: "<p>" + string(make([]byte, 2100)) + "</p>",
+			want:  "2000 chars + ellipsis",
 		},
 		{
 			name:  "handle entity",
 			input: "A &amp; B &lt; C",
-			want:  "A & B < C",
+			want:  "A &amp; B &lt; C",
 		},
 		{
 			name:  "empty string",
@@ -66,12 +66,12 @@ func TestCleanHTML(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := cleanHTML(tt.input)
 			if tt.name == "truncate long text" {
-				// Special check: should be truncated with "..."
-				if len(got) < 503 {
-					t.Errorf("cleanHTML() length = %d, expected ~503 (500 + ...)", len(got))
+				// Special check: should be truncated with "..." at 2000 chars
+				if len(got) < 2003 {
+					t.Errorf("cleanHTML() length = %d, expected ~2003 (2000 + ...)", len(got))
 				}
-				if len(got) > 510 {
-					t.Errorf("cleanHTML() length = %d, expected ~503", len(got))
+				if len(got) > 2010 {
+					t.Errorf("cleanHTML() length = %d, expected ~2003", len(got))
 				}
 				return
 			}

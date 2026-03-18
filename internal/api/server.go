@@ -146,16 +146,13 @@ func (s *Server) articlesHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
 	q := r.URL.Query()
 
-	// search 参数在 MVP 标记为 unsupported
-	if q.Get("search") != "" {
-		writeError(w, http.StatusBadRequest, "search is not supported in this version")
-		return
-	}
+	searchQuery := q.Get("search")
 
 	filter := store.ArticleFilter{
 		Category: q.Get("category"),
 		Sort:     q.Get("sort"),
 		Language: q.Get("language"),
+		Search:   searchQuery,
 	}
 
 	// Parse page
@@ -182,11 +179,27 @@ func (s *Server) articlesHandler(w http.ResponseWriter, r *http.Request) {
 		filter.PerPage = 20
 	}
 
-	articles, total, err := s.Store.QueryArticles(filter)
-	if err != nil {
-		log.Printf("[api] query articles error: %v", err)
-		writeError(w, http.StatusInternalServerError, "failed to query articles")
-		return
+	// Execute query: use FTS search if search param provided, otherwise normal query
+	var articles []store.Article
+	var total int
+	var snippets map[int64]string
+
+	if searchQuery != "" {
+		var err error
+		articles, total, snippets, err = s.Store.SearchArticles(searchQuery, filter)
+		if err != nil {
+			log.Printf("[api] search articles error: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to search articles")
+			return
+		}
+	} else {
+		var err error
+		articles, total, err = s.Store.QueryArticles(filter)
+		if err != nil {
+			log.Printf("[api] query articles error: %v", err)
+			writeError(w, http.StatusInternalServerError, "failed to query articles")
+			return
+		}
 	}
 
 	// Calculate total_pages
@@ -195,13 +208,22 @@ func (s *Server) articlesHandler(w http.ResponseWriter, r *http.Request) {
 		totalPages = (total + filter.PerPage - 1) / filter.PerPage
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	// Build response
+	resp := map[string]interface{}{
 		"articles":    articles,
 		"total":       total,
 		"page":        filter.Page,
 		"per_page":    filter.PerPage,
 		"total_pages": totalPages,
-	})
+	}
+
+	// Include snippets for search results
+	if searchQuery != "" && snippets != nil {
+		resp["snippets"] = snippets
+		resp["search"] = searchQuery
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) articleDetailHandler(w http.ResponseWriter, r *http.Request) {
