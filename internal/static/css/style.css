@@ -1646,3 +1646,483 @@ a:hover {
   opacity: 1;
   transform: scale(1.2);
 }
+
+/* ============================
+   Dashboard — 数据看板 (v0.8.0)
+   ============================ */
+.dashboard-content {
+  max-width: 1000px;
+}
+
+.dashboard-loading {
+  padding: 40px 0;
+}
+
+/* --- Stat Cards Grid --- */
+.dash-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.dash-stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  text-align: center;
+  transition: all 0.25s;
+}
+
+.dash-stat-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+
+.dash-stat-value {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--card-title-color);
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+
+.dash-stat-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+/* --- Collect Summary Bar --- */
+.dash-collect-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* --- Dashboard Section --- */
+.dash-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dash-section-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+/* --- Trend Controls --- */
+.dash-trend-controls {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 3px;
+  border: 1px solid var(--border);
+}
+
+.dash-trend-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.dash-trend-btn:hover {
+  color: var(--text-primary);
+}
+
+.dash-trend-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* --- Trend Bar Chart (pure CSS) --- */
+.dash-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: stretch;
+}
+
+.dash-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 160px;
+  padding: 0 4px;
+}
+
+.dash-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+}
+
+.dash-bar {
+  width: 100%;
+  max-width: 40px;
+  min-height: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.dash-bar-wrap:hover .dash-bar {
+  opacity: 0.8;
+}
+
+.dash-bar-tooltip {
+  position: absolute;
+  bottom: calc(100% - 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.dash-bar-wrap:hover .dash-bar-tooltip {
+  opacity: 1;
+  bottom: calc(100% + 4px);
+}
+
+.dash-chart-labels {
+  display: flex;
+  gap: 4px;
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+.dash-bar-label {
+  flex: 1;
+  text-align: center;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* --- Two Column Layout --- */
+.dash-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* --- Category Distribution --- */
+.dash-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash-category-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-cat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.dash-cat-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.dash-cat-info {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.dash-cat-bar-bg {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dash-cat-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+/* --- Source Health --- */
+.dash-source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-source-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.dash-source-item:last-child {
+  border-bottom: none;
+}
+
+.dash-source-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-source-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dash-source-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash-source-count {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.dash-source-rate {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Status dots */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-healthy {
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+}
+
+.status-degraded {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+}
+
+.status-failing {
+  background: var(--error);
+  box-shadow: 0 0 6px var(--error);
+}
+
+.status-never {
+  background: var(--text-muted);
+  opacity: 0.4;
+}
+
+/* --- Collect History --- */
+.dash-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  transition: background 0.2s;
+}
+
+.dash-history-item:hover {
+  background: var(--info-bg);
+}
+
+.dash-history-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.dash-history-time {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 85px;
+}
+
+.dash-history-detail {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.dash-history-error {
+  color: var(--error);
+  font-weight: 600;
+}
+
+/* --- Recent Articles --- */
+.dash-article-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-article-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.dash-article-item:hover {
+  background: var(--info-bg);
+  text-decoration: none;
+}
+
+.dash-article-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-article-title {
+  flex: 1;
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.dash-article-item:hover .dash-article-title {
+  color: var(--accent);
+}
+
+.dash-article-meta {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+/* --- Dashboard Empty State --- */
+.dash-empty-state {
+  text-align: center;
+  padding: 32px 20px;
+  color: var(--text-muted);
+}
+
+.dash-empty-state .empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  opacity: 0.35;
+}
+
+.dash-empty-state p {
+  font-size: 0.85rem;
+}
+
+/* --- Dashboard Responsive --- */
+@media (max-width: 768px) {
+  .dash-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dash-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-chart-bars {
+    height: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-stat-value {
+    font-size: 1.4rem;
+  }
+
+  .dash-stat-card {
+    padding: 14px 12px;
+  }
+
+  .dash-section {
+    padding: 16px;
+  }
+
+  .dash-bar-tooltip {
+    display: none;
+  }
+
+  .dash-history-time {
+    min-width: 70px;
+    font-size: 0.7rem;
+  }
+}

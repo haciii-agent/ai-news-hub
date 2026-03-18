@@ -77,6 +77,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/articles/cleanup", s.CollectSvc.HandleCleanup)
 	mux.HandleFunc("/api/v1/sources", s.CollectSvc.HandleSources)
 
+	// Dashboard (v0.8.0) — no auth required
+	mux.HandleFunc("/api/v1/dashboard/", s.dashboardRouter)
+
 	// User features (v0.7.0)
 	mux.HandleFunc("/api/v1/user/init", s.HandleUserInit)
 	mux.HandleFunc("/api/v1/bookmarks", s.bookmarksRouter)
@@ -100,6 +103,12 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  POST /api/v1/collect")
 	log.Println("  GET  /api/v1/collect/status")
 	log.Println("  GET  /api/v1/sources")
+	log.Println("  GET  /api/v1/dashboard/stats")
+	log.Println("  GET  /api/v1/dashboard/trend")
+	log.Println("  GET  /api/v1/dashboard/categories")
+	log.Println("  GET  /api/v1/dashboard/sources")
+	log.Println("  GET  /api/v1/dashboard/recent-articles")
+	log.Println("  GET  /api/v1/dashboard/collect-history")
 	log.Println("  POST /api/v1/user/init")
 	log.Println("  POST /api/v1/bookmarks")
 	log.Println("  DELETE /api/v1/bookmarks/{id}")
