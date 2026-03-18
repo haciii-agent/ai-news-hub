@@ -18,14 +18,15 @@ import (
 
 // Server holds all dependencies for the HTTP server.
 type Server struct {
-	DB         *sql.DB
-	Cfg        *config.Config
-	Store      store.ArticleStore
-	UserStore  store.UserStore
-	CollectSvc *CollectService
-	Classifier *classifier.Manager
-	Summarizer *ai.Summarizer
-	Version    string
+	DB           *sql.DB
+	Cfg          *config.Config
+	Store        store.ArticleStore
+	UserStore    store.UserStore
+	ProfileStore store.ProfileStore
+	CollectSvc   *CollectService
+	Classifier   *classifier.Manager
+	Summarizer   *ai.Summarizer
+	Version      string
 }
 
 // NewServer creates a fully-wired HTTP server with all routes registered.
@@ -66,6 +67,9 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 		},
 	}
 
+	// Initialize profile store (v1.0.0)
+	srv.initProfileStore(db)
+
 	return srv, nil
 }
 
@@ -99,6 +103,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/bookmarks", s.bookmarksRouter)
 	mux.HandleFunc("/api/v1/bookmarks/", s.bookmarksPathRouter)
 	mux.HandleFunc("/api/v1/history", s.historyRouter)
+
+	// Recommendation features (v1.0.0)
+	mux.HandleFunc("/api/v1/recommendations", s.HandleRecommendations)
+	mux.HandleFunc("/api/v1/user/profile", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			s.HandleUserProfile(w, r)
+		case http.MethodPut:
+			s.HandleUpdateUserProfile(w, r)
+		default:
+			writeError(w, http.StatusMethodNotAllowed, "only GET or PUT allowed")
+		}
+	})
+	mux.HandleFunc("/api/v1/user/streak", s.HandleReadingStreak)
 
 	// Static files (embed.FS) — serve at root, API takes precedence
 	staticFS := http.FileServer(http.FS(static.FS()))
@@ -134,6 +152,10 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  POST /api/v1/ai/generate-summary/{id}")
 	log.Println("  POST /api/v1/ai/recalculate-scores")
 	log.Println("  GET  /api/v1/ai/summary-status")
+	log.Println("  GET  /api/v1/recommendations")
+	log.Println("  GET  /api/v1/user/profile")
+	log.Println("  PUT  /api/v1/user/profile")
+	log.Println("  GET  /api/v1/user/streak")
 	log.Println("  GET  /  (static files via embed.FS)")
 	log.Println("  CORS: AllowAll (development)")
 

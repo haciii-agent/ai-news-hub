@@ -68,6 +68,15 @@ CREATE TABLE IF NOT EXISTS read_history (
 CREATE INDEX IF NOT EXISTS idx_read_history_user ON read_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_read_history_time ON read_history(read_at DESC);
 
+-- 用户画像表（v1.0.0）
+CREATE TABLE IF NOT EXISTS user_profiles (
+    user_id INTEGER PRIMARY KEY,
+    interests TEXT DEFAULT '{}',            -- JSON: {"GPT": 0.85, "NLP": 0.6, ...}
+    preferred_categories TEXT DEFAULT '[]', -- JSON: ["AI/ML", "科技前沿"]
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 -- 采集运行记录表（含 errors_count 字段，方便快速判断是否有错）
 CREATE TABLE IF NOT EXISTS collect_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

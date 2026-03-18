@@ -94,6 +94,17 @@ func (s *Server) HandleBookmarkCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Trigger profile update with bookmark weight (async)
+	if ps, ok := s.UserStore.(interface {
+		BookmarkArticleWithProfileUpdate(int64, int64) error
+	}); ok {
+		go func() {
+			if err := ps.BookmarkArticleWithProfileUpdate(userID, req.ArticleID); err != nil {
+				log.Printf("[api] profile update on bookmark error: %v", err)
+			}
+		}()
+	}
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"bookmarked": true,
 	})

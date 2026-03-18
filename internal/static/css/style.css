@@ -2390,3 +2390,121 @@ a:hover {
     gap: 16px;
   }
 }
+
+/* ===== v1.0.0: Recommendation & Profile Styles ===== */
+
+/* Recommendation reason tag */
+.rec-reason-tag {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--accent);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 6px;
+}
+
+/* Recommendation score badge */
+.rec-score-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rec-score-high {
+  color: #fff;
+  background: var(--success);
+}
+
+.rec-score-med {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.card-rec-footer {
+  margin-top: 4px;
+}
+
+/* Profile tag cloud */
+.profile-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.profile-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  transition: all 0.2s;
+  cursor: default;
+}
+
+.profile-tag:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.profile-tag.tag-xl {
+  font-size: 16px;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--accent);
+  padding: 6px 16px;
+}
+
+.profile-tag.tag-lg {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.profile-tag.tag-md {
+  font-size: 13px;
+}
+
+.profile-tag.tag-sm {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* Profile stats row */
+.profile-stats-row {
+  display: flex;
+  gap: 20px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.profile-stat {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Profile category tags */
+.profile-cats {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.profile-cat-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.profile-cat-tag:first-child {
+  margin-left: 6px;
+}

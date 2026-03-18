@@ -19,6 +19,7 @@
       <span class="header-clock" id="headerClock"></span>
     </div>
     <div class="header-right">
+      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
       <a href="/dashboard.html" class="header-nav-link header-nav-link-active" title="数据看板">📊</a>
       <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
       <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
@@ -96,6 +97,20 @@
         <div class="dash-ai-task-status" id="aiTaskStatus" style="display:none;"></div>
       </div>
 
+      <!-- User Profile Section (v1.0.0) -->
+      <div class="dash-ai-section" id="profileSection">
+        <div class="dash-ai-header">
+          <h2 class="dash-section-title">👤 我的画像</h2>
+          <span class="dash-ai-stat-label" id="profileStreak"></span>
+        </div>
+        <div id="profileContent">
+          <div class="dash-empty-state" id="profileEmpty">
+            <div class="empty-icon">👤</div>
+            <p>登录后查看个性化画像</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Latest Collect Summary -->
       <div class="dash-collect-summary" id="collectSummary" style="display:none;">
         <span id="collectSummaryText"></span>
@@ -166,7 +181,7 @@
 
     </div>
 
-    <div class="footer-copyright">AI News Hub v0.9.0 · 用心搭建 ⚡</div>
+    <div class="footer-copyright">AI News Hub v1.0.0 · 用心搭建 ⚡</div>
   </main>
 
   <script>
@@ -677,8 +692,81 @@
         });
       });
 
+      // --- Load User Profile (v1.0.0) ---
+      function loadUserProfile() {
+        var token = localStorage.getItem('user_token');
+        if (!token) return;
+
+        fetch('/api/v1/user/profile', {
+          headers: { 'X-User-Token': token },
+        }).then(function(res) { return res.json(); }).then(function(data) {
+          if (data.error || !data.interests) return;
+
+          var profileContent = document.getElementById('profileContent');
+          var profileEmpty = document.getElementById('profileEmpty');
+          var profileSection = document.getElementById('profileSection');
+
+          if (profileEmpty) profileEmpty.style.display = 'none';
+
+          // Streak info
+          var streakEl = document.getElementById('profileStreak');
+          if (streakEl && data.reading_streak > 0) {
+            streakEl.textContent = '🔥 连续阅读 ' + data.reading_streak + ' 天';
+          }
+
+          // Interest tags cloud
+          var interests = data.interests || {};
+          var tags = Object.keys(interests);
+          if (tags.length > 0) {
+            // Sort by weight
+            tags.sort(function(a, b) { return interests[b] - interests[a]; });
+
+            var tagsHTML = '<div class="profile-tag-cloud">';
+            tags.forEach(function(tag) {
+              var weight = interests[tag];
+              var sizeClass = '';
+              if (weight >= 0.7) sizeClass = 'tag-xl';
+              else if (weight >= 0.4) sizeClass = 'tag-lg';
+              else if (weight >= 0.2) sizeClass = 'tag-md';
+              else sizeClass = 'tag-sm';
+              tagsHTML += '<span class="profile-tag ' + sizeClass + '">' + escapeHTML(tag) + '</span>';
+            });
+            tagsHTML += '</div>';
+
+            // Stats row
+            tagsHTML += '<div class="profile-stats-row">'
+              + '<span class="profile-stat">📊 阅读 ' + (data.total_reads || 0) + ' 篇</span>'
+              + '<span class="profile-stat">📌 收藏 ' + (data.total_bookmarks || 0) + ' 篇</span>'
+              + '<span class="profile-stat">📅 共 ' + (data.total_reading_days || 0) + ' 天阅读</span>'
+              + '</div>';
+
+            // Preferred categories
+            if (data.preferred_categories && data.preferred_categories.length > 0) {
+              tagsHTML += '<div class="profile-cats">偏好分类: ' + data.preferred_categories.map(function(c) {
+                return '<span class="profile-cat-tag">' + escapeHTML(c) + '</span>';
+              }).join('') + '</div>';
+            }
+
+            profileContent.innerHTML = tagsHTML;
+          } else {
+            profileContent.innerHTML = '<div class="dash-empty-state">'
+              + '<div class="empty-icon">📖</div>'
+              + '<p>暂无兴趣标签，阅读更多文章来构建你的画像</p>'
+              + '<p class="empty-sub">已阅读 ' + (data.total_reads || 0) + ' 篇 · 收藏 ' + (data.total_bookmarks || 0) + ' 篇</p>'
+              + '</div>';
+          }
+        }).catch(function() {});
+      }
+
+      function escapeHTML(s) {
+        var el = document.createElement('span');
+        el.textContent = s;
+        return el.innerHTML;
+      }
+
       // --- Init ---
       loadDashboard();
+      loadUserProfile();
 
     })();
   </script>

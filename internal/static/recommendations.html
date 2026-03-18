@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>阅读历史 — AI News Hub</title>
+  <title>猜你喜欢 — AI News Hub</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
@@ -16,25 +16,27 @@
         <span class="logo-icon">📰</span>
         <span>AI News <span class="logo-text-accent">Hub</span></span>
       </a>
+      <span class="header-clock" id="headerClock"></span>
     </div>
     <div class="header-right">
-      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
+      <a href="/recommendations.html" class="header-nav-link header-nav-link-active" title="推荐">🎯</a>
       <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
       <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link header-nav-link-active" title="阅读历史">📖</a>
+      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
       <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
     </div>
   </header>
 
   <!-- Page Title Bar -->
   <div class="page-title-bar">
-    <h1 class="page-title">📖 阅读历史</h1>
-    <span class="page-subtitle" id="historyCount"></span>
+    <h1 class="page-title">🎯 猜你喜欢</h1>
+    <span class="page-subtitle" id="recReason">个性化推荐</span>
   </div>
 
   <!-- Main Content -->
   <main class="main-content">
     <div id="articleList">
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
       <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
       <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
       <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
@@ -45,6 +47,7 @@
     </div>
 
     <div id="statsFooter" class="stats-footer"></div>
+    <div class="footer-copyright">AI News Hub v1.0.0 · 用心搭建 ⚡</div>
   </main>
 
   <script>
@@ -56,12 +59,13 @@
       var totalPages = 1;
       var totalArticles = 0;
       var isLoading = false;
+      var recReason = '';
 
       var articleListEl = document.getElementById('articleList');
       var loadMoreWrap = document.getElementById('loadMoreWrap');
       var loadMoreBtn = document.getElementById('loadMoreBtn');
       var statsFooter = document.getElementById('statsFooter');
-      var historyCountEl = document.getElementById('historyCount');
+      var recReasonEl = document.getElementById('recReason');
 
       function getUserToken() {
         var token = localStorage.getItem('user_token');
@@ -91,13 +95,25 @@
         }
       })();
 
-      // Load history
-      function loadHistory(append) {
+      // Clock
+      function updateClock() {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        var s = String(now.getSeconds()).padStart(2, '0');
+        var el = document.getElementById('headerClock');
+        if (el) el.textContent = h + ':' + m + ':' + s;
+      }
+      updateClock();
+      setInterval(updateClock, 1000);
+
+      // Load recommendations
+      function loadRecommendations(append) {
         if (isLoading) return;
         isLoading = true;
 
         if (!append) {
-          articleListEl.innerHTML = renderSkeletons(3);
+          articleListEl.innerHTML = renderSkeletons(4);
           loadMoreWrap.style.display = 'none';
           statsFooter.textContent = '';
         } else {
@@ -105,7 +121,7 @@
           loadMoreBtn.textContent = '加载中';
         }
 
-        fetch(API_BASE + '/history?page=' + currentPage + '&per_page=' + PER_PAGE, {
+        fetch(API_BASE + '/recommendations?page=' + currentPage + '&per_page=' + PER_PAGE, {
           headers: { 'X-User-Token': getUserToken() },
         })
         .then(function(res) { return res.json(); })
@@ -118,24 +134,25 @@
           var articles = data.articles || [];
           totalPages = data.total_pages || 1;
           totalArticles = data.total || 0;
+          recReason = data.reason || '';
+
+          if (recReasonEl) recReasonEl.textContent = recReason;
 
           if (append) {
             if (articles.length > 0) {
-              articleListEl.insertAdjacentHTML('beforeend', renderArticles(articles, (currentPage - 1) * PER_PAGE));
+              articleListEl.insertAdjacentHTML('beforeend', renderArticles(articles));
             }
           } else {
             if (articles.length === 0) {
               articleListEl.innerHTML = '<div class="empty-state">'
-                + '<div class="empty-icon">📖</div>'
-                + '<p>还没有阅读记录</p>'
-                + '<p class="empty-sub">浏览文章详情页时将自动记录</p>'
+                + '<div class="empty-icon">🎯</div>'
+                + '<p>暂无推荐文章</p>'
+                + '<p class="empty-sub">阅读更多文章，推荐会越来越准</p>'
                 + '</div>';
             } else {
-              articleListEl.innerHTML = renderArticles(articles, 0);
+              articleListEl.innerHTML = renderArticles(articles);
             }
           }
-
-          if (historyCountEl) historyCountEl.textContent = totalArticles > 0 ? '共 ' + totalArticles + ' 篇' : '';
 
           if (currentPage < totalPages) {
             loadMoreWrap.style.display = '';
@@ -150,7 +167,7 @@
           }
         })
         .catch(function(err) {
-          console.error('Load history error:', err);
+          console.error('Load recommendations error:', err);
           if (!append) articleListEl.innerHTML = renderErrorState(null);
         })
         .finally(function() {
@@ -162,20 +179,39 @@
       loadMoreBtn.addEventListener('click', function() {
         if (isLoading || currentPage >= totalPages) return;
         currentPage++;
-        loadHistory(true);
+        loadRecommendations(true);
       });
 
-      function renderArticles(articles, startIndex) {
+      function renderArticles(articles) {
         return articles.map(function(a, i) {
           var timeStr = formatTime(a.published_at || a.collected_at);
           var detailHref = '/article.html?id=' + a.id;
-          var summary = a.summary ? escapeHtml(a.summary) : '';
+          var summary = a.ai_summary || (a.summary ? escapeHtml(a.summary) : '');
+          if (a.ai_summary) summary = escapeHtml(a.ai_summary);
           var category = a.category || '未分类';
+
+          // Recommendation reason tag
+          var recTag = '';
+          if (a.rec_reason) {
+            recTag = '<span class="rec-reason-tag">💡 ' + escapeHtml(a.rec_reason) + '</span>';
+          }
+
+          // Score badge
+          var scoreBadge = '';
+          if (a.rec_score > 0) {
+            var score = Math.round(a.rec_score);
+            if (score >= 60) {
+              scoreBadge = '<span class="rec-score-badge rec-score-high">' + score + '</span>';
+            } else if (score >= 30) {
+              scoreBadge = '<span class="rec-score-badge rec-score-med">' + score + '</span>';
+            }
+          }
 
           return '<div class="article-card" data-category="' + escapeHtml(category) + '">'
             + '<div class="card-body">'
             + '<div class="card-title-row">'
             + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
+            + scoreBadge
             + '<a class="card-url-link" href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">🔗</a>'
             + '</div>'
             + (summary ? '<p class="card-summary">' + summary + '</p>' : '')
@@ -183,7 +219,9 @@
             + '<span class="card-source">' + escapeHtml(a.source) + '</span>'
             + '<span class="card-dot">·</span>'
             + '<span class="card-time">' + timeStr + '</span>'
+            + '<span class="tag tag-' + slugify(category) + '">' + escapeHtml(category) + '</span>'
             + '</div>'
+            + (recTag ? '<div class="card-rec-footer">' + recTag + '</div>' : '')
             + '</div>'
             + '</div>';
         }).join('');
@@ -192,7 +230,7 @@
       function renderSkeletons(count) {
         var html = '';
         for (var i = 0; i < count; i++) {
-          html += '<div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>';
+          html += '<div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>';
         }
         return html;
       }
@@ -221,7 +259,11 @@
         return d.innerHTML;
       }
 
-      loadHistory(false);
+      function slugify(text) {
+        return (text || '').toLowerCase().replace(/[^a-z0-9_\u4e00-\u9fff]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+      }
+
+      loadRecommendations(false);
     })();
   </script>
 </body>

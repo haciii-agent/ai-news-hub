@@ -30,12 +30,19 @@ type UserStore interface {
 
 // userStore implements UserStore backed by a *sql.DB (SQLite).
 type userStore struct {
-	db *sql.DB
+	db     *sql.DB
+	pStore ProfileStore
 }
 
 // NewUserStore wraps an open *sql.DB into a UserStore.
+// Profile update is triggered on read history recording.
 func NewUserStore(db *sql.DB) UserStore {
-	return &userStore{db: db}
+	return &userStore{db: db, pStore: NewProfileStore(db)}
+}
+
+// NewUserStoreWithProfile creates a UserStore with an external ProfileStore (for testing).
+func NewUserStoreWithProfile(db *sql.DB, ps ProfileStore) UserStore {
+	return &userStore{db: db, pStore: ps}
 }
 
 // GetOrCreateUserByToken returns the user for the given token.
@@ -223,6 +230,7 @@ func (s *userStore) GetBookmarkedIDs(userID int64, articleIDs []int64) (map[int6
 }
 
 // RecordReadHistory records a read history entry (idempotent — updates read_at on conflict).
+// After recording, it asynchronously triggers a user profile update.
 func (s *userStore) RecordReadHistory(userID, articleID int64) error {
 	_, err := s.db.Exec(
 		`INSERT INTO read_history (user_id, article_id, read_at) VALUES (?, ?, CURRENT_TIMESTAMP)
@@ -232,7 +240,53 @@ func (s *userStore) RecordReadHistory(userID, articleID int64) error {
 	if err != nil {
 		return fmt.Errorf("record read history %d for user %d: %w", articleID, userID, err)
 	}
+
+	// Trigger profile update asynchronously (fire and forget)
+	go s.triggerProfileUpdate(userID, articleID, false)
+
 	return nil
+}
+
+// BookmarkArticleWithProfileUpdate bookmarks an article and triggers profile update with higher weight.
+func (s *userStore) BookmarkArticleWithProfileUpdate(userID, articleID int64) error {
+	err := s.BookmarkArticle(userID, articleID)
+	if err != nil {
+		return err
+	}
+
+	// Trigger profile update asynchronously with bookmark weight
+	go s.triggerProfileUpdate(userID, articleID, true)
+
+	return nil
+}
+
+// triggerProfileUpdate updates user profile based on article content.
+func (s *userStore) triggerProfileUpdate(userID, articleID int64, isBookmark bool) {
+	// Fetch article to get category and title
+	var category, title string
+	err := s.db.QueryRow(
+		`SELECT COALESCE(category, ''), COALESCE(title, '') FROM articles WHERE id = ?`,
+		articleID,
+	).Scan(&category, &title)
+	if err != nil {
+		return
+	}
+
+	var tags map[string]float64
+	if isBookmark {
+		tags = ExtractTagsFromArticleForBookmark(category, title)
+	} else {
+		tags = ExtractTagsFromArticle(category, title)
+	}
+
+	if len(tags) == 0 {
+		return
+	}
+
+	if err := s.pStore.UpdateProfileInterests(userID, tags); err != nil {
+		// Log but don't fail the original operation
+		fmt.Printf("[profile] async update failed for user %d: %v\n", userID, err)
+	}
 }
 
 // ListReadHistory returns a paginated list of recently read articles for a user.
