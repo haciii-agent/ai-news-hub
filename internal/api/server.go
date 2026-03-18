@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ai-news-hub/config"
+	"ai-news-hub/internal/ai"
 	"ai-news-hub/internal/collector"
 	"ai-news-hub/internal/classifier"
 	"ai-news-hub/internal/store"
@@ -23,6 +24,7 @@ type Server struct {
 	UserStore  store.UserStore
 	CollectSvc *CollectService
 	Classifier *classifier.Manager
+	Summarizer *ai.Summarizer
 	Version    string
 }
 
@@ -38,6 +40,14 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 		return nil, fmt.Errorf("init classifier: %w", err)
 	}
 
+	// Initialize AI summarizer (nil if not configured)
+	summarizer := ai.NewSummarizer(cfg.AI)
+	if summarizer != nil {
+		log.Println("[api] AI summarizer enabled (model: " + cfg.AI.Model + ")")
+	} else {
+		log.Println("[api] AI summarizer disabled (no API key configured)")
+	}
+
 	// Initialize collect scheduler
 	sched := collector.NewCollectScheduler(&cfg.Collector)
 
@@ -47,6 +57,7 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 		Store:      articleStore,
 		UserStore:  userStore,
 		Classifier: clr,
+		Summarizer: summarizer,
 		Version:    version,
 		CollectSvc: &CollectService{
 			Scheduler:  sched,
@@ -79,6 +90,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Dashboard (v0.8.0) — no auth required
 	mux.HandleFunc("/api/v1/dashboard/", s.dashboardRouter)
+
+	// AI features (v0.9.0)
+	mux.HandleFunc("/api/v1/ai/", s.aiRouter)
 
 	// User features (v0.7.0)
 	mux.HandleFunc("/api/v1/user/init", s.HandleUserInit)
@@ -116,6 +130,10 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  GET /api/v1/bookmarks/status")
 	log.Println("  POST /api/v1/history")
 	log.Println("  GET /api/v1/history (list)")
+	log.Println("  POST /api/v1/ai/generate-summaries")
+	log.Println("  POST /api/v1/ai/generate-summary/{id}")
+	log.Println("  POST /api/v1/ai/recalculate-scores")
+	log.Println("  GET  /api/v1/ai/summary-status")
 	log.Println("  GET  /  (static files via embed.FS)")
 	log.Println("  CORS: AllowAll (development)")
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -161,6 +162,21 @@ func migrate(db *sql.DB) error {
 		}
 		if rowsAffected, _ := result.RowsAffected(); rowsAffected > 0 {
 			log.Printf("[store] FTS backfill: indexed %d existing articles", rowsAffected)
+		}
+	}
+
+	// 4. v0.9.0: Add AI fields to articles table (ignore duplicate column errors)
+	alterStatements := []string{
+		"ALTER TABLE articles ADD COLUMN ai_summary TEXT",
+		"ALTER TABLE articles ADD COLUMN importance_score REAL DEFAULT 0",
+		"ALTER TABLE articles ADD COLUMN summary_generated_at DATETIME",
+	}
+	for _, stmt := range alterStatements {
+		if _, err := db.Exec(stmt); err != nil {
+			// Ignore "duplicate column name" errors (SQLite)
+			if !strings.Contains(err.Error(), "duplicate column") {
+				return fmt.Errorf("alter articles table: %w", err)
+			}
 		}
 	}
 

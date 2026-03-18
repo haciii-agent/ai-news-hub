@@ -14,7 +14,34 @@ type Config struct {
 	Database   DatabaseConfig   `yaml:"database"`
 	Collector  CollectorConfig  `yaml:"collector"`
 	Classifier ClassifierConfig `yaml:"classifier"`
+	AI         AIConfig         `yaml:"ai"`
 	Log        LogConfig        `yaml:"log"`
+}
+
+// AIConfig holds AI (LLM summarizer) settings.
+type AIConfig struct {
+	APIBase       string        `yaml:"api_base"`
+	APIKey        string        `yaml:"api_key"`
+	Model         string        `yaml:"model"`
+	MaxConcurrent int           `yaml:"max_concurrent"`
+	Timeout       time.Duration `yaml:"timeout"`
+}
+
+// IsEnabled returns true if the AI config has the minimum required fields set.
+func (a AIConfig) IsEnabled() bool {
+	key := a.APIKey
+	if key == "" {
+		key = os.Getenv("AI_API_KEY")
+	}
+	return key != "" && a.APIBase != ""
+}
+
+// GetAPIKey returns the API key, preferring the environment variable.
+func (a AIConfig) GetAPIKey() string {
+	if envKey := os.Getenv("AI_API_KEY"); envKey != "" {
+		return envKey
+	}
+	return a.APIKey
 }
 
 // ServerConfig holds HTTP server settings.
@@ -91,6 +118,20 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
+	}
+
+	// AI defaults
+	if cfg.AI.APIBase == "" {
+		cfg.AI.APIBase = "https://open.bigmodel.cn/api/paas/v4"
+	}
+	if cfg.AI.Model == "" {
+		cfg.AI.Model = "glm-4-flash"
+	}
+	if cfg.AI.MaxConcurrent == 0 {
+		cfg.AI.MaxConcurrent = 3
+	}
+	if cfg.AI.Timeout == 0 {
+		cfg.AI.Timeout = 15 * time.Second
 	}
 
 	return cfg, nil

@@ -38,7 +38,7 @@
     </div>
   </main>
 
-  <div class="footer-copyright">AI News Hub v0.8.0 · 用心搭建 ⚡</div>
+  <div class="footer-copyright">AI News Hub v0.9.0 · 用心搭建 ⚡</div>
 
   <script>
     // --- Article Detail Page Logic (v0.7.0 with bookmark + history) ---
@@ -108,11 +108,36 @@
             heroImg = '<img class="detail-hero-image" src="' + escapeHtml(a.image_url) + '" alt="' + escapeHtml(a.title) + '" loading="lazy" onerror="this.style.display=\'none\'">';
           }
 
+          // AI Summary section
+          var aiSummaryHtml = '';
+          if (a.ai_summary) {
+            aiSummaryHtml = '<div class="detail-ai-summary">'
+              + '<div class="detail-ai-summary-header"><span class="detail-ai-icon">🤖</span> AI 智能摘要</div>'
+              + '<div class="detail-ai-summary-body">' + escapeHtml(a.ai_summary) + '</div>'
+              + '</div>';
+          }
+
+          // Original summary (collapsible if AI summary exists)
+          var origSummaryHtml = '';
+          if (a.summary) {
+            if (a.ai_summary && a.summary !== a.ai_summary) {
+              origSummaryHtml = '<details class="detail-orig-summary"><summary>📄 原始摘要</summary><div class="detail-orig-summary-body">' + escapeHtml(a.summary) + '</div></details>';
+            } else if (!a.ai_summary) {
+              origSummaryHtml = '<div class="detail-summary">' + escapeHtml(a.summary) + '</div>';
+            }
+          }
+
+          // Importance score badge
+          var scoreHtml = '';
+          if (a.importance_score > 0) {
+            var score = Math.round(a.importance_score);
+            var scoreIcon = score >= 80 ? '🔥' : score >= 60 ? '⚡' : '📌';
+            scoreHtml = '<span class="detail-score-badge">' + scoreIcon + ' 重要度 ' + score + '/100</span>';
+          }
+
           var contentHtml = '';
           if (a.content_html) {
             contentHtml = '<div class="detail-content">' + a.content_html + '</div>';
-          } else if (a.summary) {
-            contentHtml = '<div class="detail-summary">' + escapeHtml(a.summary) + '</div>';
           }
 
           // 来源域名
@@ -131,8 +156,11 @@
             + '<span class="detail-time">🕐 ' + timeStr + '</span>'
             + '<span class="card-lang ' + langClass + '">' + langLabel + '</span>'
             + '<span class="tag ' + catClass + '">' + escapeHtml(a.category || '未分类') + '</span>'
+            + scoreHtml
             + '</div>'
             + heroImg
+            + aiSummaryHtml
+            + origSummaryHtml
             + contentHtml
             + '<div class="detail-actions">'
             + '<button class="detail-cta detail-cta-primary" id="btnPreview" onclick="togglePreview()">📖 查看正文</button>'

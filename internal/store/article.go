@@ -8,18 +8,21 @@ import (
 
 // Article 文章数据模型
 type Article struct {
-	ID          int64   `json:"id"`
-	Title       string  `json:"title"`
-	URL         string  `json:"url"`
-	Source      string  `json:"source"`
-	SourceURL   string  `json:"source_url,omitempty"`
-	Category    string  `json:"category"`
-	Summary     string  `json:"summary,omitempty"`
-	ContentHTML string  `json:"content_html,omitempty"`
-	ImageURL    string  `json:"image_url,omitempty"`
-	PublishedAt *string `json:"published_at,omitempty"`
-	CollectedAt string  `json:"collected_at"`
-	Language    string  `json:"language"`
+	ID                int64    `json:"id"`
+	Title             string   `json:"title"`
+	URL               string   `json:"url"`
+	Source            string   `json:"source"`
+	SourceURL         string   `json:"source_url,omitempty"`
+	Category          string   `json:"category"`
+	Summary           string   `json:"summary,omitempty"`
+	ContentHTML       string   `json:"content_html,omitempty"`
+	ImageURL          string   `json:"image_url,omitempty"`
+	PublishedAt       *string  `json:"published_at,omitempty"`
+	CollectedAt       string   `json:"collected_at"`
+	Language          string   `json:"language"`
+	AISummary         string   `json:"ai_summary,omitempty"`
+	ImportanceScore   float64  `json:"importance_score"`
+	SummaryGeneratedAt *string `json:"summary_generated_at,omitempty"`
 }
 
 // CollectRun 采集运行记录
@@ -47,6 +50,20 @@ type ArticleStore interface {
 	DeleteArticlesBefore(before string) (int64, error)
 	InsertCollectRun(run *CollectRun) (int64, error)
 	GetLatestCollectRun() (*CollectRun, error)
+	UpdateAISummary(id int64, summary string) error
+	UpdateImportanceScore(id int64, score float64) error
+	GetArticlesWithoutSummary(limit int) ([]Article, error)
+	GetAllArticleIDs() ([]int64, error)
+	GetSummaryStats() (*SummaryStats, error)
+}
+
+// SummaryStats AI 摘要统计
+type SummaryStats struct {
+	TotalArticles   int     `json:"total_articles"`
+	HasaISummary    int     `json:"has_ai_summary"`
+	HasOriginal     int     `json:"has_original_summary"`
+	NoSummary       int     `json:"no_summary"`
+	AICoverage      float64 `json:"ai_coverage"`
 }
 
 // ArticleFilter 文章查询过滤器
@@ -211,7 +228,7 @@ func (s *articleStore) QueryArticles(filter ArticleFilter) ([]Article, int, erro
 
 	// Paginated results.
 	offset := (filter.Page - 1) * filter.PerPage
-	querySQL := fmt.Sprintf("SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language FROM articles %s ORDER BY %s LIMIT ? OFFSET ?", where, orderBy)
+	querySQL := fmt.Sprintf("SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(importance_score,0), summary_generated_at FROM articles %s ORDER BY %s LIMIT ? OFFSET ?", where, orderBy)
 
 	qArgs := append(args, filter.PerPage, offset)
 	rows, err := s.db.Query(querySQL, qArgs...)
@@ -236,6 +253,9 @@ func (s *articleStore) QueryArticles(filter ArticleFilter) ([]Article, int, erro
 			&a.PublishedAt,
 			&a.CollectedAt,
 			&a.Language,
+			&a.AISummary,
+			&a.ImportanceScore,
+			&a.SummaryGeneratedAt,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan article: %w", err)
 		}
@@ -252,7 +272,7 @@ func (s *articleStore) QueryArticles(filter ArticleFilter) ([]Article, int, erro
 func (s *articleStore) GetArticleByID(id int64) (*Article, error) {
 	var a Article
 	err := s.db.QueryRow(`
-		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language
+		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(importance_score,0), summary_generated_at
 		FROM articles WHERE id = ?
 	`, id).Scan(
 		&a.ID,
@@ -267,6 +287,9 @@ func (s *articleStore) GetArticleByID(id int64) (*Article, error) {
 		&a.PublishedAt,
 		&a.CollectedAt,
 		&a.Language,
+		&a.AISummary,
+		&a.ImportanceScore,
+		&a.SummaryGeneratedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -405,6 +428,7 @@ func (s *articleStore) SearchArticles(query string, filter ArticleFilter) ([]Art
 		        COALESCE(articles.summary,''), COALESCE(articles.content_html,''),
 		        COALESCE(articles.image_url,''), articles.published_at,
 		        articles.collected_at, articles.language,
+		        COALESCE(articles.ai_summary,''), COALESCE(articles.importance_score,0), articles.summary_generated_at,
 		        snippet(articles_fts, 0, '<mark>', '</mark>', '...', 32)
 		 FROM articles_fts JOIN articles ON articles_fts.rowid = articles.id
 		 %s
@@ -428,6 +452,7 @@ func (s *articleStore) SearchArticles(query string, filter ArticleFilter) ([]Art
 			&a.SourceURL, &a.Category, &a.Summary,
 			&a.ContentHTML, &a.ImageURL, &a.PublishedAt,
 			&a.CollectedAt, &a.Language,
+			&a.AISummary, &a.ImportanceScore, &a.SummaryGeneratedAt,
 			&snippet,
 		); err != nil {
 			return nil, 0, nil, fmt.Errorf("scan search result: %w", err)
@@ -518,4 +543,101 @@ func (s *articleStore) GetLatestCollectRun() (*CollectRun, error) {
 		return nil, fmt.Errorf("get latest collect run: %w", err)
 	}
 	return &r, nil
+}
+
+// UpdateAISummary updates the ai_summary and summary_generated_at fields for an article.
+func (s *articleStore) UpdateAISummary(id int64, summary string) error {
+	_, err := s.db.Exec(
+		`UPDATE articles SET ai_summary = ?, summary_generated_at = datetime('now', 'localtime') WHERE id = ?`,
+		summary, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update ai_summary for article %d: %w", id, err)
+	}
+	return nil
+}
+
+// UpdateImportanceScore updates the importance_score field for an article.
+func (s *articleStore) UpdateImportanceScore(id int64, score float64) error {
+	_, err := s.db.Exec(`UPDATE articles SET importance_score = ? WHERE id = ?`, score, id)
+	if err != nil {
+		return fmt.Errorf("update importance_score for article %d: %w", id, err)
+	}
+	return nil
+}
+
+// GetArticlesWithoutSummary returns articles that don't have an AI summary yet.
+func (s *articleStore) GetArticlesWithoutSummary(limit int) ([]Article, error) {
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	rows, err := s.db.Query(`
+		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(importance_score,0), summary_generated_at
+		FROM articles
+		WHERE ai_summary IS NULL OR ai_summary = ''
+		ORDER BY collected_at DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get articles without summary: %w", err)
+	}
+	defer rows.Close()
+
+	var articles []Article
+	for rows.Next() {
+		var a Article
+		if err := rows.Scan(
+			&a.ID, &a.Title, &a.URL, &a.Source,
+			&a.SourceURL, &a.Category, &a.Summary,
+			&a.ContentHTML, &a.ImageURL, &a.PublishedAt,
+			&a.CollectedAt, &a.Language,
+			&a.AISummary, &a.ImportanceScore, &a.SummaryGeneratedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan article without summary: %w", err)
+		}
+		articles = append(articles, a)
+	}
+	return articles, rows.Err()
+}
+
+// GetAllArticleIDs returns all article IDs (for batch score recalculation).
+func (s *articleStore) GetAllArticleIDs() ([]int64, error) {
+	rows, err := s.db.Query(`SELECT id FROM articles ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("get all article ids: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan article id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// GetSummaryStats returns AI summary coverage statistics.
+func (s *articleStore) GetSummaryStats() (*SummaryStats, error) {
+	stats := &SummaryStats{}
+
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM articles`).Scan(&stats.TotalArticles); err != nil {
+		return nil, fmt.Errorf("count total articles: %w", err)
+	}
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM articles WHERE ai_summary IS NOT NULL AND ai_summary != ''`).Scan(&stats.HasaISummary); err != nil {
+		return nil, fmt.Errorf("count ai summaries: %w", err)
+	}
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM articles WHERE summary IS NOT NULL AND summary != ''`).Scan(&stats.HasOriginal); err != nil {
+		return nil, fmt.Errorf("count original summaries: %w", err)
+	}
+	stats.NoSummary = stats.TotalArticles - stats.HasOriginal
+	if stats.TotalArticles > 0 {
+		stats.AICoverage = float64(int(float64(stats.HasaISummary)/float64(stats.TotalArticles)*1000)) / 10.0
+	}
+	return stats, nil
 }

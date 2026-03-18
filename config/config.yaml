@@ -19,3 +19,12 @@ classifier:
 
 log:
   level: "info"
+
+# AI 智能摘要配置 (v0.9.0)
+# API Key 也可以通过环境变量 AI_API_KEY 设置（优先级更高）
+ai:
+  api_base: "https://open.bigmodel.cn/api/paas/v4"  # OpenAI 兼容 API 地址
+  api_key: ""            # 留空，通过环境变量 AI_API_KEY 设置
+  model: "glm-4-flash"   # 生成摘要的模型
+  max_concurrent: 3      # 并发请求数
+  timeout: 15s           # 单篇超时

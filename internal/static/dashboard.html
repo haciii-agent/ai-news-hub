@@ -65,6 +65,37 @@
         </div>
       </div>
 
+      <!-- AI Summary Coverage Card -->
+      <div class="dash-ai-section" id="aiSection">
+        <div class="dash-ai-header">
+          <h2 class="dash-section-title">🤖 AI 智能摘要</h2>
+          <div class="dash-ai-actions">
+            <button class="dash-ai-btn" id="btnRecalcScores" title="重新计算所有文章评分">📊 重算评分</button>
+            <button class="dash-ai-btn dash-ai-btn-primary" id="btnGenSummaries" title="为没有 AI 摘要的文章批量生成摘要">✨ 生成摘要</button>
+          </div>
+        </div>
+        <div class="dash-ai-stats">
+          <div class="dash-ai-stat-item">
+            <span class="dash-ai-stat-value" id="aiTotalArticles">—</span>
+            <span class="dash-ai-stat-label">总文章</span>
+          </div>
+          <div class="dash-ai-stat-item">
+            <span class="dash-ai-stat-value" id="aiHasSummary">—</span>
+            <span class="dash-ai-stat-label">AI 摘要</span>
+          </div>
+          <div class="dash-ai-stat-item">
+            <span class="dash-ai-stat-value" id="aiCoverage">—</span>
+            <span class="dash-ai-stat-label">覆盖率</span>
+          </div>
+          <div class="dash-ai-progress-wrap">
+            <div class="dash-ai-progress-bar">
+              <div class="dash-ai-progress-fill" id="aiProgressFill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="dash-ai-task-status" id="aiTaskStatus" style="display:none;"></div>
+      </div>
+
       <!-- Latest Collect Summary -->
       <div class="dash-collect-summary" id="collectSummary" style="display:none;">
         <span id="collectSummaryText"></span>
@@ -135,7 +166,7 @@
 
     </div>
 
-    <div class="footer-copyright">AI News Hub v0.8.0 · 用心搭建 ⚡</div>
+    <div class="footer-copyright">AI News Hub v0.9.0 · 用心搭建 ⚡</div>
   </main>
 
   <script>
@@ -143,6 +174,7 @@
       'use strict';
 
       const API_BASE = '/api/v1/dashboard';
+      const AI_API_BASE = '/api/v1/ai';
 
       // --- Theme ---
       const themeToggle = document.getElementById('themeToggle');
@@ -280,6 +312,8 @@
           renderArticles(articleResp);
           renderHistory(historyResp);
 
+          loadAIStatus();
+
           document.getElementById('dashboardLastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
         } catch(err) {
           loading.innerHTML = '<div class="error-state"><div class="error-icon">⚠️</div><p>加载看板数据失败</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
@@ -306,6 +340,178 @@
           summary.style.display = 'block';
         }
       }
+
+      // --- AI Summary Functions ---
+      async function loadAIStatus() {
+        try {
+          const res = await fetch(AI_API_BASE + '/summary-status');
+          const data = await res.json();
+
+          document.getElementById('aiTotalArticles').textContent = fmtNum(data.total_articles);
+          document.getElementById('aiHasSummary').textContent = fmtNum(data.has_ai_summary);
+          document.getElementById('aiCoverage').textContent = (data.ai_coverage || 0) + '%';
+
+          const fill = document.getElementById('aiProgressFill');
+          if (fill) {
+            fill.style.width = (data.ai_coverage || 0) + '%';
+            // Color based on coverage
+            if (data.ai_coverage >= 80) {
+              fill.style.background = 'var(--success)';
+            } else if (data.ai_coverage >= 50) {
+              fill.style.background = 'var(--warning)';
+            } else {
+              fill.style.background = 'var(--accent)';
+            }
+          }
+
+          // Show task status if active
+          const taskEl = document.getElementById('aiTaskStatus');
+          if (data.task && (data.task.processing || data.task.done)) {
+            taskEl.style.display = '';
+            if (data.task.processing) {
+              taskEl.innerHTML = '🔄 正在生成摘要... 已完成 ' + (data.task.success || 0) + ' 篇';
+            } else if (data.task.done) {
+              taskEl.innerHTML = '✅ 生成完成 — 成功 ' + (data.task.success || 0) + ' 篇' +
+                (data.task.failed > 0 ? '，失败 ' + data.task.failed + ' 篇' : '');
+            }
+          } else {
+            taskEl.style.display = 'none';
+          }
+        } catch(err) {
+          console.error('AI status load error:', err);
+        }
+      }
+
+      async function generateSummaries() {
+        const btn = document.getElementById('btnGenSummaries');
+        if (!btn) return;
+
+        if (!confirm('确定要为没有 AI 摘要的文章批量生成摘要吗？\n\n这会调用 AI API，可能需要几分钟时间。')) {
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '⏳ 生成中...';
+
+        try {
+          const res = await fetch(AI_API_BASE + '/generate-summaries?limit=50', { method: 'POST' });
+          const data = await res.json();
+
+          if (data.error) {
+            alert('生成失败: ' + (data.message || '未知错误'));
+            btn.disabled = false;
+            btn.textContent = '✨ 生成摘要';
+            return;
+          }
+
+          // Poll for status
+          pollAITask();
+        } catch(err) {
+          alert('请求失败: ' + err.message);
+          btn.disabled = false;
+          btn.textContent = '✨ 生成摘要';
+        }
+      }
+
+      async function recalcScores() {
+        const btn = document.getElementById('btnRecalcScores');
+        if (!btn) return;
+
+        if (!confirm('确定要重新计算所有文章的重要度评分吗？')) {
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '⏳ 计算中...';
+
+        try {
+          const res = await fetch(AI_API_BASE + '/recalculate-scores', { method: 'POST' });
+          const data = await res.json();
+
+          if (data.error) {
+            alert('计算失败: ' + (data.message || '未知错误'));
+          } else {
+            alert('评分计算完成，已更新 ' + (data.updated || 0) + ' 篇文章');
+          }
+        } catch(err) {
+          alert('请求失败: ' + err.message);
+        }
+
+        btn.disabled = false;
+        btn.textContent = '📊 重算评分';
+      }
+
+      function pollAITask() {
+        let pollCount = 0;
+        const timer = setInterval(async function() {
+          pollCount++;
+          try {
+            const res = await fetch(AI_API_BASE + '/summary-status');
+            const data = await res.json();
+
+            loadAIDisplay(data);
+
+            if (data.task && data.task.done) {
+              clearInterval(timer);
+              const btn = document.getElementById('btnGenSummaries');
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = '✨ 生成摘要';
+              }
+            } else if (pollCount > 120) {
+              // 2 minutes timeout
+              clearInterval(timer);
+              const btn = document.getElementById('btnGenSummaries');
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = '✨ 生成摘要';
+              }
+            }
+          } catch(err) {
+            clearInterval(timer);
+            const btn = document.getElementById('btnGenSummaries');
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = '✨ 生成摘要';
+            }
+          }
+        }, 2000);
+      }
+
+      function loadAIDisplay(data) {
+        document.getElementById('aiTotalArticles').textContent = fmtNum(data.total_articles);
+        document.getElementById('aiHasSummary').textContent = fmtNum(data.has_ai_summary);
+        document.getElementById('aiCoverage').textContent = (data.ai_coverage || 0) + '%';
+
+        const fill = document.getElementById('aiProgressFill');
+        if (fill) {
+          fill.style.width = (data.ai_coverage || 0) + '%';
+          if (data.ai_coverage >= 80) {
+            fill.style.background = 'var(--success)';
+          } else if (data.ai_coverage >= 50) {
+            fill.style.background = 'var(--warning)';
+          } else {
+            fill.style.background = 'var(--accent)';
+          }
+        }
+
+        const taskEl = document.getElementById('aiTaskStatus');
+        if (data.task && (data.task.processing || data.task.done)) {
+          taskEl.style.display = '';
+          if (data.task.processing) {
+            taskEl.innerHTML = '🔄 正在生成摘要... 已完成 ' + (data.task.success || 0) + ' 篇';
+          } else if (data.task.done) {
+            taskEl.innerHTML = '✅ 生成完成 — 成功 ' + (data.task.success || 0) + ' 篇' +
+              (data.task.failed > 0 ? '，失败 ' + data.task.failed + ' 篇' : '');
+          }
+        } else {
+          taskEl.style.display = 'none';
+        }
+      }
+
+      // Bind AI buttons
+      document.getElementById('btnGenSummaries').addEventListener('click', generateSummaries);
+      document.getElementById('btnRecalcScores').addEventListener('click', recalcScores);
 
       function renderTrend(data) {
         const barsEl = document.getElementById('trendBars');

@@ -19,6 +19,15 @@ func setupTestDB(t *testing.T) *sql.DB {
 		db.Close()
 		t.Fatalf("migrate: %v", err)
 	}
+	// Run ALTER TABLE migrations (v0.9.0 AI fields)
+	alterStatements := []string{
+		"ALTER TABLE articles ADD COLUMN ai_summary TEXT",
+		"ALTER TABLE articles ADD COLUMN importance_score REAL DEFAULT 0",
+		"ALTER TABLE articles ADD COLUMN summary_generated_at DATETIME",
+	}
+	for _, stmt := range alterStatements {
+		db.Exec(stmt) // ignore errors (duplicate column, etc.)
+	}
 	return db
 }
 

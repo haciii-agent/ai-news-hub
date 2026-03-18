@@ -394,12 +394,23 @@
 
       // Snippet with <mark> highlights (already HTML-safe from backend)
       var snippetText = snippets[a.id] || '';
-      // If snippet is empty, use summary (truncated) without highlights
+      // If snippet is empty, use AI summary or summary (truncated) without highlights
       var summaryHtml = '';
       if (snippetText) {
         summaryHtml = '<p class="card-summary card-snippet">' + snippetText + '</p>';
+      } else if (a.ai_summary) {
+        summaryHtml = '<p class="card-summary">' + escapeHtml(a.ai_summary) + '</p>';
       } else if (a.summary) {
         summaryHtml = '<p class="card-summary">' + escapeHtml(a.summary) + '</p>';
+      }
+
+      // Importance score badge
+      var scoreBadge = '';
+      if (a.importance_score > 0) {
+        var score = Math.round(a.importance_score);
+        var scoreIcon = score >= 80 ? '🔥' : score >= 60 ? '⚡' : '📌';
+        var scoreClass = score >= 80 ? 'score-high' : score >= 60 ? 'score-mid' : 'score-low';
+        scoreBadge = '<span class="importance-badge ' + scoreClass + '">' + scoreIcon + score + '</span>';
       }
 
       // Thumbnail
@@ -414,6 +425,7 @@
         + '<div class="card-body">'
         + '<div class="card-title-row">'
         + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
+        + scoreBadge
         + '<a class="card-url-link" href="' + escapeAttr(a.url) + '" target="_blank" rel="noopener" title="原文链接">🔗</a>'
         + '</div>'
         + summaryHtml
@@ -637,11 +649,28 @@
       var langLabel = a.language === 'zh' ? '🇨🇳' : '🇬🇧';
       var timeStr = formatTime(a.published_at || a.collected_at);
       var detailHref = '/article.html?id=' + a.id;
-      var summary = a.summary ? escapeHtml(a.summary) : '';
+      // Use AI summary if available, otherwise fall back to original
+      var displaySummary = a.ai_summary ? a.ai_summary : (a.summary ? a.summary : '');
+      var summary = displaySummary ? escapeHtml(displaySummary) : '';
       var category = a.category || '未分类';
       var isBookmarked = !!bookmarkState[a.id];
       var bookmarkIcon = isBookmarked ? '❤️' : '🤍';
       var bookmarkClass = isBookmarked ? 'bookmark-btn bookmarked' : 'bookmark-btn';
+
+      // Importance score badge
+      var scoreBadge = '';
+      if (a.importance_score > 0) {
+        var score = Math.round(a.importance_score);
+        var scoreIcon = score >= 80 ? '🔥' : score >= 60 ? '⚡' : '📌';
+        var scoreClass = score >= 80 ? 'score-high' : score >= 60 ? 'score-mid' : 'score-low';
+        scoreBadge = '<span class="importance-badge ' + scoreClass + '">' + scoreIcon + score + '</span>';
+      }
+
+      // AI summary indicator
+      var aiIndicator = a.ai_summary ? '<span class="ai-indicator" title="AI 生成摘要">🤖</span>' : '';
+
+      // Card highlight class for high-score articles
+      var highlightClass = a.importance_score >= 80 ? 'article-card-highlight' : '';
 
       // Thumbnail
       var thumbnailHtml = '';
@@ -649,12 +678,13 @@
         thumbnailHtml = '<div class="card-thumbnail"><img src="' + escapeAttr(a.image_url) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
       }
 
-      return '<div class="article-card" data-category="' + escapeAttr(category) + '">'
+      return '<div class="article-card ' + highlightClass + '" data-category="' + escapeAttr(category) + '">'
         + '<div class="card-rank">' + rank + '</div>'
         + thumbnailHtml
         + '<div class="card-body">'
         + '<div class="card-title-row">'
         + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
+        + scoreBadge + aiIndicator
         + '<button class="' + bookmarkClass + '" data-article-id="' + a.id + '" onclick="toggleCardBookmark(this)" title="收藏">💡</button>'
         + '<a class="card-url-link" href="' + escapeAttr(a.url) + '" target="_blank" rel="noopener" title="原文链接">🔗</a>'
         + '</div>'
