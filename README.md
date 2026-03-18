@@ -1,114 +1,92 @@
-# AI News Hub ⚔️
+# AI News Hub 📰
 
-AI 领域新闻聚合服务 —— 从多个 RSS/HTML 数据源自动采集、智能分类、Web 展示。
+> AI/科技新闻聚合平台 —— 多源采集、智能分类、全文搜索、原文预览，纯 Go 单二进制部署。
 
-## 功能特性
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
+[![SQLite](https://img.shields.io/badge/SQLite-FTS5-003B57?logo=sqlite)](https://www.sqlite.org/fts5.html)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-| 特性 | 说明 |
+## ✨ 功能特性
+
+| 功能 | 说明 |
 |------|------|
-| 📡 **14 个数据源** | 12 个 RSS + 2 个 HTML 抓取，覆盖中英文 AI/科技媒体 |
+| 📡 **14 个数据源** | 12 RSS + 2 HTML 抓取，覆盖中英文 AI/科技媒体 |
 | 🏷️ **8 个分类** | AI/ML、科技前沿、商业动态、开源生态、学术研究、政策监管、产品发布、综合资讯 |
-| 🤖 **智能分类** | 基于关键词加权匹配 + 数据源预分类加成的分类引擎 |
-| 🔄 **定时采集** | 内置调度器，支持手动触发 & 状态查询 |
-| 🌐 **Web UI** | 嵌入式前端，打开即用 |
-| 📦 **REST API** | 完整的 JSON API，支持分页、分类过滤、排序 |
-| 🔥 **规则热更新** | 分类规则修改后无需重启，自动检测并重载 |
+| 🤖 **智能分类** | 基于关键词加权匹配 + 数据源预分类加成 |
+| 🔍 **全文搜索** | SQLite FTS5 驱动，标题+摘要即时搜索 |
+| 📖 **原文预览** | Readability 算法提取正文，详情页内嵌展示，无需跳转原站 |
+| 🖼️ **图片提取** | 自动抓取 og:image / media:content / enclosure 封面图 |
+| 🌓 **主题切换** | 深色/浅色模式，localStorage 持久化 |
+| 🔄 **定时采集** | 内置调度器 + 手动触发 + 状态监控 |
+| 📦 **REST API** | 完整 JSON API，支持分页、分类、语言过滤 |
+| 🐳 **单二进制** | 前端嵌入 `embed.FS`，一个文件搞定部署 |
 
-### 数据源一览
+## 📡 数据源
 
 | 类型 | 数据源 |
 |------|--------|
 | RSS | Hacker News, TechCrunch AI, The Verge AI, OpenAI Blog, Google AI Blog, MIT Tech Review, Ars Technica, HuggingFace Blog, 36氪, InfoQ 中文, 少数派, 极客公园 |
 | HTML | 机器之心, 量子位 |
 
-## 快速开始
+## 🚀 快速开始
 
-### 本地运行
-
-**前提：** Go 1.25+, GCC (CGO required for SQLite)
+**前提：** Go 1.25+
 
 ```bash
-# 克隆项目
-git clone <repo-url> && cd news-hub
+git clone https://github.com/haciii-agent/ai-news-hub.git
+cd ai-news-hub
 
 # 编译
-make build
+go build -ldflags "-X main.version=latest" -o ai-news-hub .
 
 # 启动
 ./ai-news-hub
-# 或
-make run
 ```
 
-服务启动后访问 http://localhost:8080
+访问 http://localhost:8080 即可使用。
 
-### Docker 部署
-
-```bash
-# 一键启动
-make docker-up
-
-# 查看日志
-make docker-logs
-
-# 停止
-make docker-down
-```
-
-## API 文档
+## 📋 API 文档
 
 ### 健康检查
 
 ```
 GET /health
-GET /healthz
-```
-
-```json
-{"status": "ok", "service": "ai-news-hub", "version": "0.1.0"}
 ```
 
 ### 文章列表
 
 ```
-GET /api/v1/articles?category=ai_ml&page=1&per_page=20&sort=published_at&language=en
+GET /api/v1/articles?category=AI/ML&page=1&per_page=20&sort=published_at&language=en
 ```
 
-**参数：**
+### 全文搜索
 
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `category` | string | - | 按分类过滤，可选值见 `/api/v1/categories` |
-| `page` | int | 1 | 页码 |
-| `per_page` | int | 20 | 每页条数 (1-100) |
-| `sort` | string | `published_at` | 排序字段 |
-| `language` | string | - | 语言过滤 (`en` / `zh`) |
+```
+GET /api/v1/articles?search=量子计算
+```
 
-### 文章详情
+### 文章详情 & 原文预览
 
 ```
 GET /api/v1/articles/{id}
+GET /api/v1/articles/{id}/content   # 获取/提取原文正文
 ```
 
-### 分类列表 & 统计
+### 分类 & 数据源
 
 ```
 GET /api/v1/categories
+GET /api/v1/sources
 ```
 
-### 手动触发采集
+### 采集控制
 
 ```
-POST /api/v1/collect
+POST /api/v1/collect              # 手动触发采集
+GET  /api/v1/collect/status       # 查询采集状态
 ```
 
-### 采集状态查询
-
-```
-GET /api/v1/collect/status
-```
-
-## 配置说明
+## ⚙️ 配置
 
 主配置文件：`config/config.yaml`
 
@@ -124,6 +102,7 @@ collector:
   user_agent: "ai-news-hub/1.0"
   timeout: 30s
   max_concurrent: 5
+  rss_max_items: 20
   request_interval: "2-5s"
 
 classifier:
@@ -133,50 +112,82 @@ log:
   level: "info"
 ```
 
-环境变量：
+环境变量 `NEWS_HUB_CONFIG` 可指定配置文件路径。
 
-| 变量 | 说明 |
-|------|------|
-| `NEWS_HUB_CONFIG` | 指定配置文件路径（默认 `./config/config.yaml`） |
-
-### 分类规则
-
-分类规则定义在 `config/rules.yaml`，包含 8 个分类的关键词和权重配置。
-
-> ⚠️ **PERIODIC_UPDATE 标记**
->
-> 分类规则中标注了 `# PERIODIC_UPDATE` 的关键词为时效性关键词（如产品型号、模型版本号等），需要定期维护更新以保持分类准确性。建议每 1-2 个月审查一次。
-
-## 项目结构
+## 📁 项目结构
 
 ```
-news-hub/
-├── main.go                          # 入口
+ai-news-hub/
+├── main.go                           # 入口
 ├── config/
-│   ├── config.go                    # 配置加载
-│   ├── config.yaml                  # 主配置
-│   └── rules.yaml                   # 分类规则
+│   ├── config.go                     # 配置加载
+│   ├── config.yaml                   # 主配置
+│   └── rules.yaml                    # 分类规则（8类关键词权重）
 ├── internal/
-│   ├── api/                         # HTTP API
-│   ├── classifier/                  # 分类引擎
-│   ├── collector/                   # 数据采集
-│   ├── static/                      # 嵌入式前端
-│   └── store/                       # SQLite 存储
-├── Makefile
-├── Dockerfile
-├── docker-compose.yaml
+│   ├── api/                          # HTTP API 路由 + Handler
+│   │   ├── server.go                 # 路由注册
+│   │   ├── handler_article.go        # 文章/搜索/原文预览
+│   │   └── handler_collect.go        # 采集控制/数据源/统计
+│   ├── classifier/                   # 智能分类引擎
+│   │   ├── classifier.go             # 关键词加权分类
+│   │   └── rules.yaml                # 分类规则数据
+│   ├── collector/                    # 数据采集
+│   │   ├── collector.go              # 采集调度器
+│   │   ├── rss.go                    # RSS/Atom 解析
+│   │   ├── html.go                   # HTML 页面抓取 + 专用解析器
+│   │   ├── readability.go            # Readability 正文提取
+│   │   └── sources.go                # 数据源注册表（14源）
+│   ├── static/                       # 嵌入式前端 (embed.FS)
+│   │   ├── index.html                # 首页（新闻列表 + 搜索 + 分类筛选）
+│   │   ├── article.html              # 详情页（正文预览 + 主题切换）
+│   │   ├── css/style.css             # 深色/浅色双主题样式
+│   │   ├── js/app.js                 # 前端交互逻辑
+│   │   └── static.go                 # embed 声明
+│   └── store/                        # SQLite 数据层
+│       ├── sqlite.go                 # 建表/迁移/FTS5 索引
+│       └── article.go                # CRUD + 搜索 + 统计
+├── TASK_v050_fix.md                  # 开发任务记录
+├── TASK_v060.md                      # 开发任务记录
 └── README.md
 ```
 
-## MVP 功能限制
+## 📝 版本历史
 
-当前版本为 MVP，以下功能暂不可用：
+### v0.6.0 — 原文预览
+- Readability 算法提取正文（article → main → 启发式 → 文本密度 → body 回退）
+- 详情页内嵌正文展示，支持展开/收起
+- 服务端代理抓取 + content_html 缓存
+- 标签白名单过滤，图片 URL 绝对化
+- SSRF 防护（仅允许 http/https）
 
-| 功能 | 状态 | 说明 |
-|------|------|------|
-| 🔍 全文搜索 | ⚠️ 暂不可用 | `search` 参数已预留接口，后端返回 400 |
+### v0.5.0 — 全文搜索
+- SQLite FTS5 全文搜索引擎（标题 + 摘要）
+- `?search=关键词` 接口支持
+- og:image / media:content / enclosure 图片自动提取
+- 摘要扩展至 2000 字符
 
-后续迭代将集成全文搜索引擎（如 SQLite FTS5 或 MeiliSearch）。
+### v0.3.0 — 视觉大改版
+- 深色模式 UI 重设计（参考 Product Hunt / 少数派风格）
+- 分类药丸标签 + 数量气泡
+- 采集状态标签（✓/⚠️/✗）
+- 实时时钟 + 统计栏
+- `/api/v1/sources` 数据源接口
+
+### v0.2.0 — 体验优化
+- RSS 超时/条数配置化
+- 前端交互优化 + 接口补全
+
+### v0.1.0 — MVP
+- 14 个数据源采集
+- 8 个智能分类
+- 纯 Go 单二进制 + 嵌入式前端
+
+## 🛠️ 技术栈
+
+- **后端：** Go 1.25+ / SQLite (modernc.org/sqlite, 纯 Go 无 CGO)
+- **前端：** 原生 HTML/CSS/JS，通过 `embed.FS` 嵌入二进制
+- **数据库：** SQLite + FTS5 全文搜索
+- **采集：** RSS/Atom (gofeed) + HTML DOM 解析 (golang.org/x/net/html)
 
 ## License
 
