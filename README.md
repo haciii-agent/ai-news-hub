@@ -4,7 +4,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-FTS5-003B57?logo=sqlite)](https://www.sqlite.org/fts5.html)
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](https://github.com/haciii-agent/ai-news-hub/releases)
+[![Version](https://img.shields.io/badge/Version-1.1.0-blue)](https://github.com/haciii-agent/ai-news-hub/releases)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ## ✨ 功能特性
@@ -22,6 +22,7 @@
 | 🔥 **重要度评分** | 多维度文章评分（来源权重+时效性+分类热度+关键词+摘要+图片） |
 | 📌 **收藏 & 📖 阅读历史** | 匿名 Token 机制，无需注册登录 |
 | 📊 **运营看板** | 采集监控 + 增长趋势 + 分类分布 + 数据源健康度 + AI 摘要覆盖度 |
+| 📈 **热点趋势** | 话题排行榜 + 趋势时间线 + 选题推荐 + 关联话题发现 |
 | 🖼️ **图片提取** | 自动抓取 og:image / media:content / enclosure 封面图 |
 | 🌓 **主题切换** | 深色/浅色模式，localStorage 持久化 |
 | 🔄 **定时采集** | 内置调度器 + 手动触发 + 状态监控 |
@@ -121,6 +122,15 @@ GET /api/v1/dashboard/recent-articles?limit=10            # 最新文章
 GET /api/v1/dashboard/collect-history?limit=10            # 采集历史
 ```
 
+### 热点趋势
+
+```
+GET /api/v1/trends/hot?period=7d&limit=20                # 热点话题排行
+GET /api/v1/trends/timeline?keyword=GPT&days=14          # 关键词趋势时间线
+GET /api/v1/trends/story-pitches?limit=10                # 选题推荐列表
+GET /api/v1/trends/related?keyword=AI&limit=10           # 关联话题
+```
+
 ### 采集 & 分类
 
 ```
@@ -182,12 +192,14 @@ ai-news-hub/
 │   ├── ai/                           # AI 服务
 │   │   ├── summarizer.go             # LLM 智能摘要生成
 │   │   ├── scorer.go                 # 多维度重要度评分算法
-│   │   └── recommender.go            # 个性化推荐算法
+│   │   ├── recommender.go            # 个性化推荐算法
+│   │   └── trend.go                  # 热点趋势分析引擎
 │   ├── api/                          # HTTP API
 │   │   ├── server.go                 # 路由注册 + 中间件
 │   │   ├── handler_article.go        # 文章/搜索/原文预览
 │   │   ├── handler_collect.go        # 采集控制/数据源/统计
 │   │   ├── handler_dashboard.go      # 数据看板 API
+│   │   ├── handler_trend.go          # 热点趋势 API
 │   │   ├── handler_user.go           # 用户/收藏/历史
 │   │   ├── handler_ai.go             # AI 摘要/评分
 │   │   └── handler_recommend.go      # 推荐/画像
@@ -207,6 +219,7 @@ ai-news-hub/
 │   │   ├── bookmarks.html            # 收藏列表页
 │   │   ├── history.html              # 阅读历史页
 │   │   ├── dashboard.html            # 运营看板（统计/趋势/源状态/画像）
+│   │   ├── trends.html               # 热点趋势（排行榜/时间线/选题推荐）
 │   │   ├── css/style.css             # 深色/浅色双主题样式
 │   │   ├── js/app.js                 # 前端交互逻辑
 │   │   └── static.go                 # embed 声明
@@ -220,6 +233,19 @@ ai-news-hub/
 ```
 
 ## 📝 版本历史
+
+### v1.1.0 — AI 热点趋势分析
+- 热点话题排行榜（综合热度评分：频率40% + 增速25% + 来源多样性15% + 用户互动20%）
+- 趋势方向判断（rising/stable/declining，对比24h前后频率变化）
+- 关键词趋势时间线（14天柱状图，纯 CSS 实现）
+- 选题推荐列表（可写性评分：文章数+来源多样性+趋势方向+摘要可用性）
+- 关联话题发现（基于关键词共现频率）
+- 中英文关键词提取（Go 代码分词 + 停用词过滤，无需 NLP 库）
+- 时间加权词频统计（越新的文章权重越高）
+- 相似词合并（GPT-5 / GPT5 自动合并）
+- 新增趋势分析页面（排行榜 + 趋势搜索 + 选题推荐）
+- 4 个新 API：/api/v1/trends/hot, timeline, story-pitches, related
+- 纯本地计算，不依赖 LLM
 
 ### v1.0.0 — 个性化推荐
 - 基于内容的推荐算法（分类匹配 + 标签匹配 + 重要度 + 时效性 + 多样性）

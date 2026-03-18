@@ -104,6 +104,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/bookmarks/", s.bookmarksPathRouter)
 	mux.HandleFunc("/api/v1/history", s.historyRouter)
 
+	// Trend analysis features (v1.1.0)
+	mux.HandleFunc("/api/v1/trends/hot", s.HandleTrendHot)
+	mux.HandleFunc("/api/v1/trends/timeline", s.HandleTrendTimeline)
+	mux.HandleFunc("/api/v1/trends/story-pitches", s.HandleTrendStoryPitches)
+	mux.HandleFunc("/api/v1/trends/related", s.HandleTrendRelated)
+
 	// Recommendation features (v1.0.0)
 	mux.HandleFunc("/api/v1/recommendations", s.HandleRecommendations)
 	mux.HandleFunc("/api/v1/user/profile", func(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +158,10 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  POST /api/v1/ai/generate-summary/{id}")
 	log.Println("  POST /api/v1/ai/recalculate-scores")
 	log.Println("  GET  /api/v1/ai/summary-status")
+	log.Println("  GET  /api/v1/trends/hot")
+	log.Println("  GET  /api/v1/trends/timeline")
+	log.Println("  GET  /api/v1/trends/story-pitches")
+	log.Println("  GET  /api/v1/trends/related")
 	log.Println("  GET  /api/v1/recommendations")
 	log.Println("  GET  /api/v1/user/profile")
 	log.Println("  PUT  /api/v1/user/profile")

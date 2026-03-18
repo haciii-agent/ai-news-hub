@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>趋势分析 — AI News Hub</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">
+        <span class="logo-icon">📰</span>
+        <span>AI News <span class="logo-text-accent">Hub</span></span>
+      </a>
+      <span class="header-clock" id="headerClock"></span>
+    </div>
+    <div class="header-right">
+      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
+      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+      <a href="/trends.html" class="header-nav-link header-nav-link-active" title="趋势分析">📈</a>
+      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    </div>
+  </header>
+
+  <!-- Page Title Bar -->
+  <div class="page-title-bar">
+    <h1 class="page-title">📈 热点趋势分析</h1>
+    <span class="page-subtitle" id="trendLastUpdate"></span>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content trend-content">
+
+    <!-- Loading skeleton -->
+    <div id="trendLoading" class="dashboard-loading">
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+    </div>
+
+    <!-- Trend content (hidden until loaded) -->
+    <div id="trendContent" style="display:none;">
+
+      <!-- Period Switcher -->
+      <div class="trend-period-bar">
+        <button class="trend-period-btn" data-period="24h">24小时</button>
+        <button class="trend-period-btn active" data-period="7d">7天</button>
+        <button class="trend-period-btn" data-period="30d">30天</button>
+        <span class="trend-period-hint" id="trendHint"></span>
+      </div>
+
+      <!-- Hot Topics Ranking -->
+      <div class="dash-section" id="hotTopicsSection">
+        <div class="dash-section-header">
+          <h2 class="dash-section-title">🔥 热点话题排行榜</h2>
+          <span class="trend-topic-count" id="topicCount"></span>
+        </div>
+        <div id="hotTopicsList">
+          <div class="empty-state">
+            <div class="empty-icon">📊</div>
+            <p>正在加载热点数据…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Keyword Trend Search -->
+      <div class="dash-section">
+        <div class="dash-section-header">
+          <h2 class="dash-section-title">📈 关键词趋势搜索</h2>
+        </div>
+        <div class="trend-search-wrap">
+          <input type="text" id="trendSearchInput" class="trend-search-input" placeholder="输入关键词，查看14天趋势…">
+          <button class="trend-search-btn" id="trendSearchBtn">搜索</button>
+        </div>
+        <div id="trendChartWrap" style="display:none;">
+          <div class="trend-chart-summary" id="trendChartSummary"></div>
+          <div class="dash-chart">
+            <div class="dash-chart-bars" id="trendBars"></div>
+            <div class="dash-chart-labels" id="trendLabels"></div>
+          </div>
+        </div>
+        <div id="trendChartEmpty" style="display:none;">
+          <div class="dash-empty-state">
+            <div class="empty-icon">🔍</div>
+            <p>输入关键词开始搜索趋势</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Story Pitches -->
+      <div class="dash-section">
+        <div class="dash-section-header">
+          <h2 class="dash-section-title">✍️ 选题推荐</h2>
+          <span class="trend-pitch-hint">适合写深度博客的话题</span>
+        </div>
+        <div id="storyPitchesList">
+          <div class="empty-state">
+            <div class="empty-icon">✍️</div>
+            <p>正在生成选题推荐…</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+  (function() {
+    'use strict';
+
+    // --- Clock ---
+    function updateClock() {
+      const el = document.getElementById('headerClock');
+      if (el) {
+        const now = new Date();
+        el.textContent = now.toLocaleString('zh-CN', {
+          month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        });
+      }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // --- Theme ---
+    const themeToggle = document.getElementById('themeToggle');
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    if (themeToggle) {
+      themeToggle.textContent = savedTheme === 'light' ? '🌞' : '🌙';
+      themeToggle.addEventListener('click', function() {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        themeToggle.textContent = next === 'light' ? '🌞' : '🌙';
+      });
+    }
+
+    // --- State ---
+    let currentPeriod = '7d';
+    let hotTopicsData = null;
+
+    // --- API Base ---
+    const apiBase = window.location.origin;
+
+    // --- Period Buttons ---
+    document.querySelectorAll('.trend-period-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.trend-period-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentPeriod = btn.dataset.period;
+        loadHotTopics();
+      });
+    });
+
+    // --- Load Hot Topics ---
+    function loadHotTopics() {
+      fetch(apiBase + '/api/v1/trends/hot?period=' + currentPeriod + '&limit=20')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          hotTopicsData = data;
+          renderHotTopics(data);
+          loadStoryPitches();
+        })
+        .catch(function(err) {
+          console.error('Failed to load hot topics:', err);
+          document.getElementById('hotTopicsList').innerHTML =
+            '<div class="error-state"><div class="error-icon">⚠️</div><p>加载热点数据失败</p></div>';
+        });
+    }
+
+    // --- Render Hot Topics ---
+    function renderHotTopics(data) {
+      document.getElementById('trendLoading').style.display = 'none';
+      document.getElementById('trendContent').style.display = 'block';
+
+      var topics = data.topics || [];
+      document.getElementById('topicCount').textContent = topics.length + ' 个话题';
+
+      if (data.generated_at) {
+        document.getElementById('trendLastUpdate').textContent = '更新于 ' + new Date(data.generated_at).toLocaleString('zh-CN');
+      }
+
+      // Hint for low article count
+      var hint = document.getElementById('trendHint');
+      if (topics.length > 0 && topics[0].article_count < 5) {
+        hint.textContent = '⚠️ 文章数量较少，趋势分析可能不准确';
+        hint.style.display = 'inline';
+      } else {
+        hint.style.display = 'none';
+      }
+
+      if (topics.length === 0) {
+        document.getElementById('hotTopicsList').innerHTML =
+          '<div class="dash-empty-state"><div class="empty-icon">📭</div><p>暂无热点数据，请等待更多文章采集</p></div>';
+        return;
+      }
+
+      var html = '';
+      topics.forEach(function(topic, idx) {
+        var trendIcon = '';
+        var trendClass = '';
+        var trendLabel = '';
+        switch(topic.trend) {
+          case 'rising':
+            trendIcon = '🔴';
+            trendClass = 'trend-rising';
+            trendLabel = '↑ rising';
+            break;
+          case 'stable':
+            trendIcon = '🟡';
+            trendClass = 'trend-stable';
+            trendLabel = '→ stable';
+            break;
+          case 'declining':
+            trendIcon = '🟢';
+            trendClass = 'trend-declining';
+            trendLabel = '↓ declining';
+            break;
+          default:
+            trendIcon = '⚪';
+            trendClass = '';
+            trendLabel = '— unknown';
+        }
+
+        var scoreClass = 'score-high';
+        if (topic.score < 60) scoreClass = 'score-mid';
+        if (topic.score < 30) scoreClass = 'score-low';
+
+        html += '<div class="trend-topic-item" data-keyword="' + escapeAttr(topic.keyword) + '">';
+        html += '  <div class="trend-topic-main">';
+        html += '    <div class="trend-topic-left">';
+        html += '      <span class="trend-rank">#' + (idx + 1) + '</span>';
+        html += '      <span class="trend-keyword">' + escapeHtml(topic.keyword) + '</span>';
+        html += '      <span class="importance-badge ' + scoreClass + '">' + Math.round(topic.score) + '</span>';
+        html += '      <span class="trend-indicator ' + trendClass + '">' + trendIcon + ' ' + trendLabel + '</span>';
+        html += '    </div>';
+        html += '    <div class="trend-topic-right">';
+        html += '      <span class="trend-count">' + topic.article_count + '篇</span>';
+        if (topic.recent_count > 0) {
+          html += '      <span class="trend-recent">24h ' + topic.recent_count + '篇</span>';
+        }
+        html += '    </div>';
+        html += '  </div>';
+
+        // Related tags
+        if (topic.related_tags && topic.related_tags.length > 0) {
+          html += '  <div class="trend-tags">';
+          topic.related_tags.forEach(function(tag) {
+            html += '<span class="trend-tag">' + escapeHtml(tag) + '</span>';
+          });
+          html += '  </div>';
+        }
+
+        // Top articles (expandable)
+        if (topic.top_articles && topic.top_articles.length > 0) {
+          html += '  <div class="trend-articles-toggle" onclick="toggleTrendArticles(this)">▼ 相关文章</div>';
+          html += '  <div class="trend-articles-list" style="display:none;">';
+          topic.top_articles.forEach(function(art) {
+            html += '<a href="/article.html?id=' + art.id + '" class="dash-article-item">';
+            html += '  <span class="dash-article-title">' + escapeHtml(art.title) + '</span>';
+            html += '  <span class="dash-article-meta">' + escapeHtml(art.source) + '</span>';
+            html += '</a>';
+          });
+          html += '  </div>';
+        }
+
+        html += '</div>';
+      });
+
+      document.getElementById('hotTopicsList').innerHTML = html;
+    }
+
+    // --- Load Story Pitches ---
+    function loadStoryPitches() {
+      fetch(apiBase + '/api/v1/trends/story-pitches?limit=10')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          renderStoryPitches(data.pitches || []);
+        })
+        .catch(function(err) {
+          console.error('Failed to load story pitches:', err);
+        });
+    }
+
+    // --- Render Story Pitches ---
+    function renderStoryPitches(pitches) {
+      if (pitches.length === 0) {
+        document.getElementById('storyPitchesList').innerHTML =
+          '<div class="dash-empty-state"><div class="empty-icon">📭</div><p>暂无选题推荐</p></div>';
+        return;
+      }
+
+      var html = '';
+      pitches.forEach(function(pitch, idx) {
+        var scoreClass = pitch.score >= 70 ? 'score-high' : (pitch.score >= 40 ? 'score-mid' : 'score-low');
+        var writeClass = pitch.writability >= 70 ? 'score-high' : (pitch.writability >= 40 ? 'score-mid' : 'score-low');
+
+        html += '<div class="trend-pitch-item">';
+        html += '  <div class="trend-pitch-rank">#' + (idx + 1) + '</div>';
+        html += '  <div class="trend-pitch-body">';
+        html += '    <div class="trend-pitch-title">' + escapeHtml(pitch.topic) + '</div>';
+        html += '    <div class="trend-pitch-reason">' + escapeHtml(pitch.reason) + '</div>';
+        html += '    <div class="trend-pitch-meta">';
+        html += '      <span>⭐ 综合评分</span><span class="importance-badge ' + scoreClass + '">' + Math.round(pitch.score) + '</span>';
+        html += '      <span>✍️ 可写性</span><span class="importance-badge ' + writeClass + '">' + Math.round(pitch.writability) + '</span>';
+        html += '    </div>';
+        if (pitch.angle) {
+          html += '    <div class="trend-pitch-angle">💡 ' + escapeHtml(pitch.angle) + '</div>';
+        }
+        if (pitch.top_sources && pitch.top_sources.length > 0) {
+          html += '    <div class="trend-pitch-sources">📰 ' + pitch.top_sources.map(escapeHtml).join(' · ') + '</div>';
+        }
+        html += '  </div>';
+        html += '</div>';
+      });
+
+      document.getElementById('storyPitchesList').innerHTML = html;
+    }
+
+    // --- Keyword Trend Search ---
+    var searchInput = document.getElementById('trendSearchInput');
+    var searchBtn = document.getElementById('trendSearchBtn');
+
+    searchBtn.addEventListener('click', function() { doTrendSearch(); });
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doTrendSearch();
+    });
+
+    function doTrendSearch() {
+      var keyword = searchInput.value.trim();
+      if (!keyword) return;
+
+      fetch(apiBase + '/api/v1/trends/timeline?keyword=' + encodeURIComponent(keyword) + '&days=14')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          renderTrendChart(data);
+        })
+        .catch(function(err) {
+          console.error('Failed to load timeline:', err);
+        });
+    }
+
+    function renderTrendChart(data) {
+      document.getElementById('trendChartEmpty').style.display = 'none';
+      document.getElementById('trendChartWrap').style.display = 'block';
+
+      var points = data.data || [];
+      var peak = data.peak;
+
+      // Summary
+      var totalCount = points.reduce(function(sum, p) { return sum + p.count; }, 0);
+      var summaryHtml = '📊 <strong>' + escapeHtml(data.keyword) + '</strong> — 近14天共 <strong>' + totalCount + '</strong> 篇相关文章';
+      if (peak && peak.count > 0) {
+        summaryHtml += '，峰值在 <strong>' + peak.date + '</strong>（' + peak.count + '篇）';
+      }
+      document.getElementById('trendChartSummary').innerHTML = summaryHtml;
+
+      // Find max for scaling
+      var maxCount = 1;
+      points.forEach(function(p) { if (p.count > maxCount) maxCount = p.count; });
+
+      // Build bars
+      var barsHtml = '';
+      var labelsHtml = '';
+
+      points.forEach(function(p, idx) {
+        var height = p.count > 0 ? Math.max(4, (p.count / maxCount) * 140) : 2;
+        var isPeak = peak && p.date === peak.date;
+        var barColor = isPeak ? 'background: linear-gradient(180deg, var(--accent), var(--accent-hover));' : '';
+
+        barsHtml += '<div class="dash-bar-wrap">';
+        barsHtml += '  <div class="dash-bar-tooltip">' + p.count + ' 篇</div>';
+        barsHtml += '  <div class="dash-bar" style="height:' + height + 'px;' + barColor + '"></div>';
+        barsHtml += '</div>';
+
+        // Labels: show every other label to avoid crowding
+        if (idx % 2 === 0 || points.length <= 14) {
+          labelsHtml += '<div class="dash-bar-label">' + p.date.slice(5) + '</div>';
+        } else {
+          labelsHtml += '<div class="dash-bar-label"></div>';
+        }
+      });
+
+      document.getElementById('trendBars').innerHTML = barsHtml;
+      document.getElementById('trendLabels').innerHTML = labelsHtml;
+    }
+
+    // --- Toggle trend articles ---
+    window.toggleTrendArticles = function(el) {
+      var list = el.nextElementSibling;
+      if (list.style.display === 'none') {
+        list.style.display = 'block';
+        el.textContent = '▲ 收起文章';
+      } else {
+        list.style.display = 'none';
+        el.textContent = '▼ 相关文章';
+      }
+    };
+
+    // --- Helpers ---
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escapeAttr(str) {
+      if (!str) return '';
+      return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // --- Init ---
+    loadHotTopics();
+
+  })();
+  </script>
+
+</body>
+</html>
