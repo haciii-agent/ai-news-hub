@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的收藏 — AI News Hub</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">
+        <span class="logo-icon">📰</span>
+        <span>AI News <span class="logo-text-accent">Hub</span></span>
+      </a>
+    </div>
+    <div class="header-right">
+      <a href="/bookmarks.html" class="header-nav-link header-nav-link-active" title="收藏">📌</a>
+      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    </div>
+  </header>
+
+  <!-- Page Title Bar -->
+  <div class="page-title-bar">
+    <h1 class="page-title">📌 我的收藏</h1>
+    <span class="page-subtitle" id="bookmarkCount"></span>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div id="articleList">
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
+      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
+    </div>
+
+    <div id="loadMoreWrap" class="load-more-wrap" style="display:none;">
+      <button id="loadMoreBtn" class="load-more-btn">加载更多</button>
+    </div>
+
+    <div id="statsFooter" class="stats-footer"></div>
+  </main>
+
+  <script>
+    (function() {
+      'use strict';
+      var API_BASE = '/api/v1';
+      var PER_PAGE = 20;
+      var currentPage = 1;
+      var totalPages = 1;
+      var totalArticles = 0;
+      var isLoading = false;
+
+      var articleListEl = document.getElementById('articleList');
+      var loadMoreWrap = document.getElementById('loadMoreWrap');
+      var loadMoreBtn = document.getElementById('loadMoreBtn');
+      var statsFooter = document.getElementById('statsFooter');
+      var bookmarkCountEl = document.getElementById('bookmarkCount');
+
+      function getUserToken() {
+        var token = localStorage.getItem('user_token');
+        if (!token) {
+          token = crypto.randomUUID();
+          localStorage.setItem('user_token', token);
+        }
+        return token;
+      }
+
+      function authHeaders() {
+        return {
+          'Content-Type': 'application/json',
+          'X-User-Token': getUserToken(),
+        };
+      }
+
+      // Theme
+      (function() {
+        var saved = localStorage.getItem('theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+        var btn = document.getElementById('themeToggle');
+        if (btn) {
+          function updateIcon() {
+            btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+          }
+          updateIcon();
+          btn.addEventListener('click', function() {
+            var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateIcon();
+          });
+        }
+      })();
+
+      // Load bookmarks
+      function loadBookmarks(append) {
+        if (isLoading) return;
+        isLoading = true;
+
+        if (!append) {
+          articleListEl.innerHTML = renderSkeletons(3);
+          loadMoreWrap.style.display = 'none';
+          statsFooter.textContent = '';
+        } else {
+          loadMoreBtn.disabled = true;
+          loadMoreBtn.textContent = '加载中';
+        }
+
+        fetch(API_BASE + '/bookmarks?page=' + currentPage + '&per_page=' + PER_PAGE, {
+          headers: { 'X-User-Token': getUserToken() },
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.error) {
+            if (!append) articleListEl.innerHTML = renderErrorState(data.message);
+            return;
+          }
+
+          var articles = data.articles || [];
+          totalPages = data.total_pages || 1;
+          totalArticles = data.total || 0;
+
+          if (append) {
+            if (articles.length > 0) {
+              articleListEl.insertAdjacentHTML('beforeend', renderArticles(articles, (currentPage - 1) * PER_PAGE));
+            }
+          } else {
+            if (articles.length === 0) {
+              articleListEl.innerHTML = '<div class="empty-state">'
+                + '<div class="empty-icon">📌</div>'
+                + '<p>还没有收藏任何文章</p>'
+                + '<p class="empty-sub">浏览新闻时点击 ❤️ 即可收藏</p>'
+                + '</div>';
+            } else {
+              articleListEl.innerHTML = renderArticles(articles, 0);
+            }
+          }
+
+          if (bookmarkCountEl) bookmarkCountEl.textContent = totalArticles > 0 ? '共 ' + totalArticles + ' 篇' : '';
+
+          if (currentPage < totalPages) {
+            loadMoreWrap.style.display = '';
+            loadMoreBtn.disabled = false;
+            loadMoreBtn.textContent = '加载更多';
+          } else {
+            loadMoreWrap.style.display = 'none';
+          }
+
+          if (totalArticles > 0) {
+            statsFooter.textContent = '共 ' + totalArticles + ' 篇 · 第 ' + currentPage + '/' + totalPages + ' 页';
+          }
+        })
+        .catch(function(err) {
+          console.error('Load bookmarks error:', err);
+          if (!append) articleListEl.innerHTML = renderErrorState(null);
+        })
+        .finally(function() {
+          isLoading = false;
+          loadMoreBtn.disabled = false;
+        });
+      }
+
+      loadMoreBtn.addEventListener('click', function() {
+        if (isLoading || currentPage >= totalPages) return;
+        currentPage++;
+        loadBookmarks(true);
+      });
+
+      function renderArticles(articles, startIndex) {
+        return articles.map(function(a, i) {
+          var timeStr = formatTime(a.published_at || a.collected_at);
+          var detailHref = '/article.html?id=' + a.id;
+          var summary = a.summary ? escapeHtml(a.summary) : '';
+          var category = a.category || '未分类';
+
+          return '<div class="article-card" data-category="' + escapeHtml(category) + '">'
+            + '<div class="card-body">'
+            + '<div class="card-title-row">'
+            + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
+            + '<button class="bookmark-btn-small" data-article-id="' + a.id + '" onclick="unbookmark(this)" title="取消收藏">❤️</button>'
+            + '<a class="card-url-link" href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">🔗</a>'
+            + '</div>'
+            + (summary ? '<p class="card-summary">' + summary + '</p>' : '')
+            + '<div class="card-meta">'
+            + '<span class="card-source">' + escapeHtml(a.source) + '</span>'
+            + '<span class="card-dot">·</span>'
+            + '<span class="card-time">' + timeStr + '</span>'
+            + '</div>'
+            + '</div>'
+            + '</div>';
+        }).join('');
+      }
+
+      window.unbookmark = function(btn) {
+        var articleId = btn.dataset.articleId;
+        var card = btn.closest('.article-card');
+
+        fetch(API_BASE + '/bookmarks/' + articleId, {
+          method: 'DELETE',
+          headers: authHeaders(),
+        }).then(function(res) { return res.json(); }).then(function(data) {
+          if (!data.error && card) {
+            card.style.transition = 'all 0.3s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(40px)';
+            setTimeout(function() {
+              card.remove();
+              totalArticles--;
+              if (bookmarkCountEl) bookmarkCountEl.textContent = totalArticles > 0 ? '共 ' + totalArticles + ' 篇' : '';
+              if (totalArticles === 0) {
+                articleListEl.innerHTML = '<div class="empty-state">'
+                  + '<div class="empty-icon">📌</div>'
+                  + '<p>还没有收藏任何文章</p>'
+                  + '<p class="empty-sub">浏览新闻时点击 ❤️ 即可收藏</p>'
+                  + '</div>';
+                statsFooter.textContent = '';
+              }
+            }, 300);
+          }
+        }).catch(function() {});
+      };
+
+      function renderSkeletons(count) {
+        var html = '';
+        for (var i = 0; i < count; i++) {
+          html += '<div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>';
+        }
+        return html;
+      }
+
+      function renderErrorState(msg) {
+        return '<div class="error-state"><div class="error-icon">🔌</div><p>' + escapeHtml(msg || '加载失败，请稍后再试') + '</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
+      }
+
+      function formatTime(dateStr) {
+        if (!dateStr) return '';
+        try {
+          var d = new Date(dateStr);
+          var diff = new Date() - d;
+          if (diff < 60000) return '刚刚';
+          if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+          if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+          if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+          return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        } catch (e) { return dateStr; }
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+      }
+
+      loadBookmarks(false);
+    })();
+  </script>
+</body>
+</html>

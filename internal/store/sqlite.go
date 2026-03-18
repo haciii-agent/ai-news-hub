@@ -30,6 +30,43 @@ CREATE INDEX IF NOT EXISTS idx_articles_category ON articles(category);
 CREATE INDEX IF NOT EXISTS idx_articles_published ON articles(published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_articles_collected ON articles(collected_at DESC);
 
+-- 用户表（匿名 token 机制）
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_token ON users(token);
+
+-- 收藏表
+CREATE TABLE IF NOT EXISTS bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    article_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (article_id) REFERENCES articles(id),
+    UNIQUE(user_id, article_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON bookmarks(user_id);
+
+-- 阅读历史表
+CREATE TABLE IF NOT EXISTS read_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    article_id INTEGER NOT NULL,
+    read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (article_id) REFERENCES articles(id),
+    UNIQUE(user_id, article_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_read_history_user ON read_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_read_history_time ON read_history(read_at DESC);
+
 -- 采集运行记录表（含 errors_count 字段，方便快速判断是否有错）
 CREATE TABLE IF NOT EXISTS collect_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -18,6 +18,8 @@
       </a>
     </div>
     <div class="header-right">
+      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
       <a href="/?search=" class="search-link-detail" id="searchLink" title="搜索新闻">🔍</a>
       <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
     </div>
@@ -35,13 +37,30 @@
     </div>
   </main>
 
-  <div class="footer-copyright">AI News Hub v0.6.0 · 用心搭建 ⚡</div>
+  <div class="footer-copyright">AI News Hub v0.7.0 · 用心搭建 ⚡</div>
 
   <script>
-    // --- Article Detail Page Logic ---
+    // --- Article Detail Page Logic (v0.7.0 with bookmark + history) ---
     (function () {
       const API_BASE = '/api/v1';
       const detailEl = document.getElementById('detailContent');
+
+      // --- User Token Management ---
+      function getUserToken() {
+        let token = localStorage.getItem('user_token');
+        if (!token) {
+          token = crypto.randomUUID();
+          localStorage.setItem('user_token', token);
+        }
+        return token;
+      }
+
+      function authHeaders() {
+        return {
+          'Content-Type': 'application/json',
+          'X-User-Token': getUserToken(),
+        };
+      }
 
       // Parse article ID from URL: /article.html?id=123
       const params = new URLSearchParams(window.location.search);
@@ -55,28 +74,40 @@
       // Update page title
       document.title = '加载中… — AI News Hub';
 
-      fetch(`${API_BASE}/articles/${encodeURIComponent(articleId)}`)
-        .then(res => res.json())
-        .then(data => {
+      // Record read history (fire and forget)
+      fetch(API_BASE + '/history', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ article_id: parseInt(articleId) }),
+      }).catch(function() {});
+
+      fetch(API_BASE + '/articles/' + encodeURIComponent(articleId), {
+        headers: { 'X-User-Token': getUserToken() },
+      })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
           if (data.error) {
-            detailEl.innerHTML = `<div class="error-state"><div class="error-icon">😔</div><p>${escapeHtml(data.message || '加载失败')}</p></div>`;
+            detailEl.innerHTML = '<div class="error-state"><div class="error-icon">😔</div><p>' + escapeHtml(data.message || '加载失败') + '</p></div>';
             return;
           }
 
-          const a = data;
-          document.title = `${a.title} — AI News Hub`;
+          var a = data;
+          document.title = a.title + ' — AI News Hub';
 
-          const catClass = 'tag-' + (a.category ? slugify(a.category) : 'unknown');
-          const langClass = a.language === 'zh' ? 'zh' : 'en';
-          const langLabel = a.language === 'zh' ? '🇨🇳 中文' : '🇬🇧 EN';
-          const timeStr = formatTime(a.published_at || a.collected_at);
+          var catClass = 'tag-' + (a.category ? slugify(a.category) : 'unknown');
+          var langClass = a.language === 'zh' ? 'zh' : 'en';
+          var langLabel = a.language === 'zh' ? '🇨🇳 中文' : '🇬🇧 EN';
+          var timeStr = formatTime(a.published_at || a.collected_at);
+          var isBookmarked = !!a.is_bookmarked;
+          var bookmarkIcon = isBookmarked ? '❤️' : '🤍';
+          var bookmarkText = isBookmarked ? '已收藏' : '收藏';
 
-          let heroImg = '';
+          var heroImg = '';
           if (a.image_url) {
             heroImg = '<img class="detail-hero-image" src="' + escapeHtml(a.image_url) + '" alt="' + escapeHtml(a.title) + '" loading="lazy" onerror="this.style.display=\'none\'">';
           }
 
-          let contentHtml = '';
+          var contentHtml = '';
           if (a.content_html) {
             contentHtml = '<div class="detail-content">' + a.content_html + '</div>';
           } else if (a.summary) {
@@ -84,69 +115,101 @@
           }
 
           // 来源域名
-          let sourceDomain = '';
+          var sourceDomain = '';
           try {
             sourceDomain = new URL(a.url).hostname;
           } catch (e) {
             sourceDomain = a.source || '';
           }
 
-          detailEl.innerHTML = `
-            <div class="detail-card">
-              <h1 class="detail-title">${escapeHtml(a.title)}</h1>
-              <div class="detail-meta">
-                <span class="detail-source">📌 ${escapeHtml(a.source)}</span>
-                <span class="card-dot">·</span>
-                <span class="detail-time">🕐 ${timeStr}</span>
-                <span class="card-lang ${langClass}">${langLabel}</span>
-                <span class="tag ${catClass}">${escapeHtml(a.category || '未分类')}</span>
-              </div>
-              ${heroImg}
-              ${contentHtml}
-              <div class="detail-actions">
-                <button class="detail-cta detail-cta-primary" id="btnPreview" onclick="togglePreview()">
-                  📖 查看正文
-                </button>
-                <a class="detail-cta detail-cta-secondary" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">
-                  🔗 原文链接
-                </a>
-              </div>
-              <div class="content-preview" id="contentPreview" style="display:none;">
-                <div class="content-preview-header">
-                  <span>📖 正文预览</span>
-                  <span class="content-preview-source">来源: ${escapeHtml(sourceDomain)}</span>
-                </div>
-                <div class="content-preview-body" id="previewBody">
-                  <div class="loading-wrap" style="padding:40px 0;">
-                    <div class="spinner"></div>
-                    <p>正在提取正文…</p>
-                  </div>
-                </div>
-                <div class="content-preview-footer">
-                  ⚠️ 此内容由 AI 自动提取，如有错漏请以原文为准
-                </div>
-              </div>
-            </div>
-          `;
+          detailEl.innerHTML = '<div class="detail-card">'
+            + '<h1 class="detail-title">' + escapeHtml(a.title) + '</h1>'
+            + '<div class="detail-meta">'
+            + '<span class="detail-source">📌 ' + escapeHtml(a.source) + '</span>'
+            + '<span class="card-dot">·</span>'
+            + '<span class="detail-time">🕐 ' + timeStr + '</span>'
+            + '<span class="card-lang ' + langClass + '">' + langLabel + '</span>'
+            + '<span class="tag ' + catClass + '">' + escapeHtml(a.category || '未分类') + '</span>'
+            + '</div>'
+            + heroImg
+            + contentHtml
+            + '<div class="detail-actions">'
+            + '<button class="detail-cta detail-cta-primary" id="btnPreview" onclick="togglePreview()">📖 查看正文</button>'
+            + '<a class="detail-cta detail-cta-secondary" href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">🔗 原文链接</a>'
+            + '<button class="detail-cta detail-cta-bookmark" id="btnBookmark" data-bookmarked="' + isBookmarked + '" data-article-id="' + a.id + '" onclick="toggleBookmark(this)">'
+            + '<span class="bookmark-icon">' + bookmarkIcon + '</span> <span class="bookmark-text">' + bookmarkText + '</span>'
+            + '</button>'
+            + '</div>'
+            + '<div class="content-preview" id="contentPreview" style="display:none;">'
+            + '<div class="content-preview-header">'
+            + '<span>📖 正文预览</span>'
+            + '<span class="content-preview-source">来源: ' + escapeHtml(sourceDomain) + '</span>'
+            + '</div>'
+            + '<div class="content-preview-body" id="previewBody">'
+            + '<div class="loading-wrap" style="padding:40px 0;">'
+            + '<div class="spinner"></div>'
+            + '<p>正在提取正文…</p>'
+            + '</div>'
+            + '</div>'
+            + '<div class="content-preview-footer">⚠️ 此内容由 AI 自动提取，如有错漏请以原文为准</div>'
+            + '</div>'
+            + '</div>';
 
           // Store article URL for preview
           window._articleUrl = a.url;
           window._previewLoaded = false;
           window._previewOpen = false;
         })
-        .catch(err => {
+        .catch(function(err) {
           detailEl.innerHTML = '<div class="error-state"><div class="error-icon">🔌</div><p>网络错误，请重试</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
           console.error('Article fetch error:', err);
         });
 
+      // --- Toggle bookmark (global for onclick) ---
+      window.toggleBookmark = function(btn) {
+        var articleId = btn.dataset.articleId;
+        var isBookmarked = btn.dataset.bookmarked === 'true';
+        var iconEl = btn.querySelector('.bookmark-icon');
+        var textEl = btn.querySelector('.bookmark-text');
+
+        if (isBookmarked) {
+          // Unbookmark
+          fetch(API_BASE + '/bookmarks/' + articleId, {
+            method: 'DELETE',
+            headers: authHeaders(),
+          }).then(function(res) { return res.json(); }).then(function(data) {
+            if (!data.error) {
+              btn.dataset.bookmarked = 'false';
+              iconEl.textContent = '🤍';
+              textEl.textContent = '收藏';
+              btn.classList.remove('bookmarked');
+            }
+          }).catch(function() {});
+        } else {
+          // Bookmark
+          fetch(API_BASE + '/bookmarks', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ article_id: parseInt(articleId) }),
+          }).then(function(res) { return res.json(); }).then(function(data) {
+            if (!data.error) {
+              btn.dataset.bookmarked = 'true';
+              iconEl.textContent = '❤️';
+              textEl.textContent = '已收藏';
+              btn.classList.add('bookmarked', 'bookmark-pop');
+              setTimeout(function() { btn.classList.remove('bookmark-pop'); }, 500);
+            }
+          }).catch(function() {});
+        }
+      };
+
       // --- Toggle preview ---
       window.togglePreview = function() {
-        const preview = document.getElementById('contentPreview');
-        const btn = document.getElementById('btnPreview');
+        var preview = document.getElementById('contentPreview');
+        var btn = document.getElementById('btnPreview');
         if (!preview || !btn) return;
 
         if (window._previewOpen) {
-          // Close
           preview.style.display = 'none';
           btn.textContent = '📖 查看正文';
           btn.disabled = false;
@@ -154,20 +217,18 @@
           return;
         }
 
-        // Open
         window._previewOpen = true;
         preview.style.display = 'block';
         preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         if (!window._previewLoaded) {
-          // Fetch content
           btn.disabled = true;
           btn.innerHTML = '<span class="btn-spinner"></span> 提取中…';
 
-          fetch(`${API_BASE}/articles/${encodeURIComponent(articleId)}/content`)
-            .then(res => res.json())
-            .then(data => {
-              const body = document.getElementById('previewBody');
+          fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/content')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              var body = document.getElementById('previewBody');
               if (!body) return;
 
               if (data.error && data.html === undefined) {
@@ -177,17 +238,16 @@
                 return;
               }
 
-              // Update source and timing info
-              const headerEl = preview.querySelector('.content-preview-header');
+              var headerEl = preview.querySelector('.content-preview-header');
               if (headerEl) {
-                let timingInfo = '';
+                var timingInfo = '';
                 if (data.fetch_time_ms > 0) {
-                  timingInfo = ` · 耗时: ${(data.fetch_time_ms / 1000).toFixed(1)}s`;
+                  timingInfo = ' · 耗时: ' + (data.fetch_time_ms / 1000).toFixed(1) + 's';
                 }
                 if (data.cached) {
                   timingInfo += ' · 已缓存';
                 }
-                const existingSource = headerEl.querySelector('.content-preview-source');
+                var existingSource = headerEl.querySelector('.content-preview-source');
                 if (existingSource) {
                   existingSource.textContent = existingSource.textContent + timingInfo;
                 }
@@ -203,8 +263,8 @@
               }
               btn.disabled = false;
             })
-            .catch(err => {
-              const body = document.getElementById('previewBody');
+            .catch(function(err) {
+              var body = document.getElementById('previewBody');
               if (body) {
                 body.innerHTML = '<div class="content-preview-error">网络错误，请重试</div>';
               }
@@ -224,7 +284,7 @@
 
       function escapeHtml(str) {
         if (!str) return '';
-        const d = document.createElement('div');
+        var d = document.createElement('div');
         d.textContent = str;
         return d.innerHTML;
       }
@@ -232,26 +292,26 @@
       function formatTime(dateStr) {
         if (!dateStr) return '';
         try {
-          const d = new Date(dateStr);
-          const now = new Date();
-          const diff = now - d;
+          var d = new Date(dateStr);
+          var now = new Date();
+          var diff = now - d;
           if (diff < 60000) return '刚刚';
           if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
           if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
           if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
           return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-        } catch {
+        } catch (e) {
           return dateStr;
         }
       }
 
       // Theme toggle
       (function() {
-        const saved = localStorage.getItem('theme');
+        var saved = localStorage.getItem('theme');
         if (saved) {
           document.documentElement.setAttribute('data-theme', saved);
         }
-        const btn = document.getElementById('themeToggle');
+        var btn = document.getElementById('themeToggle');
         if (btn) {
           function updateIcon() {
             var isLight = document.documentElement.getAttribute('data-theme') === 'light';

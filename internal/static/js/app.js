@@ -7,6 +7,26 @@
   const API_BASE = '/api/v1';
   const PER_PAGE = 20;
 
+  // --- User Token (v0.7.0) ---
+  function getUserToken() {
+    let token = localStorage.getItem('user_token');
+    if (!token) {
+      token = crypto.randomUUID();
+      localStorage.setItem('user_token', token);
+    }
+    return token;
+  }
+
+  function authHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'X-User-Token': getUserToken(),
+    };
+  }
+
+  // Bookmark state cache
+  let bookmarkState = {}; // { articleId: bool }
+
   // --- State ---
   let currentLang = 'all';
   let currentCategory = '';
@@ -71,6 +91,13 @@
     initTheme();
     bindEvents();
     startClock();
+    // Init user token (ensures it exists in localStorage)
+    getUserToken();
+    // Fire-and-forget user init
+    fetch(API_BASE + '/user/init', {
+      method: 'POST',
+      headers: authHeaders(),
+    }).catch(function() {});
     await loadStats();
     await loadCategories();
 
@@ -293,7 +320,9 @@
       if (currentCategory) params.set('category', currentCategory);
       if (currentLang !== 'all') params.set('language', currentLang);
 
-      var res = await fetch(API_BASE + '/articles?' + params);
+      var res = await fetch(API_BASE + '/articles?' + params, {
+        headers: { 'X-User-Token': getUserToken() },
+      });
       var data = await res.json();
 
       if (data.error) {
@@ -318,6 +347,11 @@
         } else {
           articleListEl.innerHTML = renderSearchResults(articles, snippets, 0);
         }
+      }
+
+      // Fetch bookmark status for search results
+      if (articles.length > 0) {
+        fetchBookmarkStatus(articles);
       }
 
       // Load more button
@@ -534,7 +568,9 @@
       if (currentCategory) params.set('category', currentCategory);
       if (currentLang !== 'all') params.set('language', currentLang);
 
-      var res = await fetch(API_BASE + '/articles?' + params);
+      var res = await fetch(API_BASE + '/articles?' + params, {
+        headers: { 'X-User-Token': getUserToken() },
+      });
       var data = await res.json();
 
       if (data.error) {
@@ -558,6 +594,11 @@
         } else {
           articleListEl.innerHTML = renderArticles(articles, 0);
         }
+      }
+
+      // Fetch bookmark status for current page articles
+      if (articles.length > 0) {
+        fetchBookmarkStatus(articles);
       }
 
       // Load more button
@@ -598,6 +639,9 @@
       var detailHref = '/article.html?id=' + a.id;
       var summary = a.summary ? escapeHtml(a.summary) : '';
       var category = a.category || '未分类';
+      var isBookmarked = !!bookmarkState[a.id];
+      var bookmarkIcon = isBookmarked ? '❤️' : '🤍';
+      var bookmarkClass = isBookmarked ? 'bookmark-btn bookmarked' : 'bookmark-btn';
 
       // Thumbnail
       var thumbnailHtml = '';
@@ -611,6 +655,7 @@
         + '<div class="card-body">'
         + '<div class="card-title-row">'
         + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
+        + '<button class="' + bookmarkClass + '" data-article-id="' + a.id + '" onclick="toggleCardBookmark(this)" title="收藏">💡</button>'
         + '<a class="card-url-link" href="' + escapeAttr(a.url) + '" target="_blank" rel="noopener" title="原文链接">🔗</a>'
         + '</div>'
         + (summary ? '<p class="card-summary">' + summary + '</p>' : '')
@@ -681,5 +726,75 @@
   function escapeAttr(str) {
     return escapeHtml(str);
   }
+
+  // --- Bookmark functions (v0.7.0) ---
+
+  async function fetchBookmarkStatus(articles) {
+    if (!articles || articles.length === 0) return;
+    var ids = articles.map(function(a) { return a.id; }).join(',');
+    try {
+      var res = await fetch(API_BASE + '/bookmarks/status?ids=' + ids, {
+        headers: { 'X-User-Token': getUserToken() },
+      });
+      var data = await res.json();
+      if (data.bookmarks) {
+        // Merge into state
+        for (var key in data.bookmarks) {
+          bookmarkState[key] = data.bookmarks[key];
+        }
+        updateBookmarkIcons();
+      }
+    } catch (err) {
+      // Silent fail
+    }
+  }
+
+  function updateBookmarkIcons() {
+    var buttons = document.querySelectorAll('.bookmark-btn');
+    buttons.forEach(function(btn) {
+      var id = btn.dataset.articleId;
+      var isBookmarked = !!bookmarkState[id];
+      btn.textContent = isBookmarked ? '❤️' : '🤍';
+      if (isBookmarked) {
+        btn.classList.add('bookmarked');
+      } else {
+        btn.classList.remove('bookmarked');
+      }
+    });
+  }
+
+  // Global toggle function for card bookmark buttons
+  window.toggleCardBookmark = function(btn) {
+    var articleId = btn.dataset.articleId;
+    var isBookmarked = !!bookmarkState[articleId];
+
+    if (isBookmarked) {
+      // Unbookmark
+      fetch(API_BASE + '/bookmarks/' + articleId, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }).then(function(res) { return res.json(); }).then(function(data) {
+        if (!data.error) {
+          bookmarkState[articleId] = false;
+          btn.textContent = '🤍';
+          btn.classList.remove('bookmarked');
+        }
+      }).catch(function() {});
+    } else {
+      // Bookmark
+      fetch(API_BASE + '/bookmarks', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ article_id: parseInt(articleId) }),
+      }).then(function(res) { return res.json(); }).then(function(data) {
+        if (!data.error) {
+          bookmarkState[articleId] = true;
+          btn.textContent = '❤️';
+          btn.classList.add('bookmarked', 'bookmark-pop');
+          setTimeout(function() { btn.classList.remove('bookmark-pop'); }, 500);
+        }
+      }).catch(function() {});
+    }
+  };
 
 })();

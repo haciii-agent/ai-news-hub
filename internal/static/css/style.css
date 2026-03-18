@@ -1494,3 +1494,155 @@ a:hover {
     display: none;
   }
 }
+
+/* ============================
+   Header Nav Links — 导航链接 (v0.7.0)
+   ============================ */
+.header-nav-link {
+  background: var(--lang-bg);
+  border: 1px solid var(--lang-border);
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.header-nav-link:hover {
+  background: var(--lang-hover);
+  color: var(--text-primary);
+  transform: scale(1.1);
+  text-decoration: none;
+}
+
+.header-nav-link-active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ============================
+   Page Title Bar — 页面标题栏 (v0.7.0)
+   ============================ */
+.page-title-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.page-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+
+.page-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ============================
+   Bookmark Buttons — 收藏按钮 (v0.7.0)
+   ============================ */
+.bookmark-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.25s ease;
+  opacity: 0;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.article-card:hover .bookmark-btn {
+  opacity: 1;
+}
+
+.bookmark-btn:hover {
+  transform: scale(1.2);
+}
+
+.bookmark-btn.bookmarked {
+  opacity: 1;
+  color: var(--accent);
+}
+
+/* Bookmark heart pop animation */
+.bookmark-pop {
+  animation: bookmarkPop 0.5s ease;
+}
+
+@keyframes bookmarkPop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.4); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* Bookmark button in detail page */
+.detail-cta-bookmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  padding: 12px 28px;
+  border-radius: 28px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: 1px solid var(--border);
+  transition: all 0.25s;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.detail-cta-bookmark:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.detail-cta-bookmark.bookmarked {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.detail-cta-bookmark.bookmark-pop {
+  animation: bookmarkPop 0.5s ease;
+}
+
+/* Bookmark button in bookmarks page (small, inline) */
+.bookmark-btn-small {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px;
+  border-radius: 50%;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.bookmark-btn-small:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}

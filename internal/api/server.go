@@ -20,6 +20,7 @@ type Server struct {
 	DB         *sql.DB
 	Cfg        *config.Config
 	Store      store.ArticleStore
+	UserStore  store.UserStore
 	CollectSvc *CollectService
 	Classifier *classifier.Manager
 	Version    string
@@ -29,6 +30,7 @@ type Server struct {
 func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) {
 	// Initialize store
 	articleStore := store.NewArticleStore(db)
+	userStore := store.NewUserStore(db)
 
 	// Initialize classifier
 	clr, err := classifier.NewManager(cfg.Classifier.RulesPath)
@@ -43,6 +45,7 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 		DB:         db,
 		Cfg:        cfg,
 		Store:      articleStore,
+		UserStore:  userStore,
 		Classifier: clr,
 		Version:    version,
 		CollectSvc: &CollectService{
@@ -74,6 +77,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/articles/cleanup", s.CollectSvc.HandleCleanup)
 	mux.HandleFunc("/api/v1/sources", s.CollectSvc.HandleSources)
 
+	// User features (v0.7.0)
+	mux.HandleFunc("/api/v1/user/init", s.HandleUserInit)
+	mux.HandleFunc("/api/v1/bookmarks", s.bookmarksRouter)
+	mux.HandleFunc("/api/v1/bookmarks/", s.bookmarksPathRouter)
+	mux.HandleFunc("/api/v1/history", s.historyRouter)
+
 	// Static files (embed.FS) — serve at root, API takes precedence
 	staticFS := http.FileServer(http.FS(static.FS()))
 	mux.Handle("/", staticFS)
@@ -91,6 +100,13 @@ func (s *Server) Handler() http.Handler {
 	log.Println("  POST /api/v1/collect")
 	log.Println("  GET  /api/v1/collect/status")
 	log.Println("  GET  /api/v1/sources")
+	log.Println("  POST /api/v1/user/init")
+	log.Println("  POST /api/v1/bookmarks")
+	log.Println("  DELETE /api/v1/bookmarks/{id}")
+	log.Println("  GET /api/v1/bookmarks (list)")
+	log.Println("  GET /api/v1/bookmarks/status")
+	log.Println("  POST /api/v1/history")
+	log.Println("  GET /api/v1/history (list)")
 	log.Println("  GET  /  (static files via embed.FS)")
 	log.Println("  CORS: AllowAll (development)")
 
@@ -292,4 +308,48 @@ func (s *Server) categoriesHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"categories": stats,
 	})
+}
+
+// --- Bookmark/History Routers ---
+
+// bookmarksRouter routes /api/v1/bookmarks requests (no trailing path).
+// GET → list bookmarks; POST → create bookmark
+func (s *Server) bookmarksRouter(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.HandleBookmarkList(w, r)
+	case http.MethodPost:
+		s.HandleBookmarkCreate(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "only GET or POST allowed")
+	}
+}
+
+// bookmarksPathRouter routes /api/v1/bookmarks/... requests (with trailing path).
+// /api/v1/bookmarks/status → GET bookmark status
+// /api/v1/bookmarks/{id} → DELETE bookmark
+func (s *Server) bookmarksPathRouter(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/bookmarks/")
+	path = strings.TrimSuffix(path, "/")
+
+	if path == "status" {
+		s.HandleBookmarkStatus(w, r)
+		return
+	}
+
+	// Default: treat as /api/v1/bookmarks/{id} for DELETE
+	s.HandleBookmarkDelete(w, r)
+}
+
+// historyRouter routes /api/v1/history requests.
+// GET → list history; POST → record history
+func (s *Server) historyRouter(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.HandleHistoryList(w, r)
+	case http.MethodPost:
+		s.HandleHistoryRecord(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "only GET or POST allowed")
+	}
 }
