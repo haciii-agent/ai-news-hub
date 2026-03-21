@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 / 注册 — AI News Hub</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">
+        <span class="logo-icon">📰</span>
+        <span>AI News <span class="logo-text-accent">Hub</span></span>
+      </a>
+    </div>
+    <div class="header-right">
+      <div id="navUserArea" class="nav-user-area"></div>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    </div>
+  </header>
+
+  <!-- Auth Card -->
+  <main class="auth-main">
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login" onclick="switchTab('login')">登录</button>
+        <button class="auth-tab" data-tab="register" onclick="switchTab('register')">注册</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginInput">用户名或邮箱</label>
+          <input type="text" id="loginInput" autocomplete="username" required placeholder="输入用户名或邮箱">
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">密码</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" required placeholder="输入密码">
+        </div>
+        <div id="loginError" class="form-hint error" style="display:none"></div>
+        <button type="submit" class="btn-primary" id="loginBtn">登录</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" class="auth-form" style="display:none" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="regUsername">用户名</label>
+          <input type="text" id="regUsername" autocomplete="username" required placeholder="3-20字符，字母/数字/下划线/中文" maxlength="20">
+          <div id="usernameHint" class="form-hint"></div>
+        </div>
+        <div class="form-group">
+          <label for="regEmail">邮箱</label>
+          <input type="email" id="regEmail" autocomplete="email" required placeholder="your@email.com">
+          <div id="emailHint" class="form-hint"></div>
+        </div>
+        <div class="form-group">
+          <label for="regPassword">密码</label>
+          <input type="password" id="regPassword" autocomplete="new-password" required placeholder="至少8位，含大小写字母和数字" minlength="8">
+          <div class="password-strength" id="passwordStrength">
+            <div class="strength-bar" id="strengthBar"></div>
+          </div>
+          <div id="strengthText" class="form-hint"></div>
+        </div>
+        <div class="form-group">
+          <label for="regPasswordConfirm">确认密码</label>
+          <input type="password" id="regPasswordConfirm" autocomplete="new-password" required placeholder="再次输入密码">
+          <div id="confirmHint" class="form-hint"></div>
+        </div>
+        <div id="registerError" class="form-hint error" style="display:none"></div>
+        <button type="submit" class="btn-primary" id="registerBtn">注册</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="js/auth.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    // --- Theme ---
+    (function() {
+      var saved = localStorage.getItem('theme');
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
+      var btn = document.getElementById('themeToggle');
+      if (btn) {
+        function updateIcon() {
+          btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+        }
+        updateIcon();
+        btn.addEventListener('click', function() {
+          var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', next);
+          localStorage.setItem('theme', next);
+          updateIcon();
+        });
+      }
+    })();
+
+    // --- Tab ---
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('tab') === 'register') {
+      switchTab('register');
+    }
+
+    window.switchTab = function(tab) {
+      document.querySelectorAll('.auth-tab').forEach(function(t) {
+        t.classList.toggle('active', t.dataset.tab === tab);
+      });
+      document.getElementById('loginForm').style.display = tab === 'login' ? '' : 'none';
+      document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+    };
+
+    // --- Username check ---
+    var usernameTimer = null;
+    document.getElementById('regUsername').addEventListener('input', function() {
+      clearTimeout(usernameTimer);
+      var val = this.value.trim();
+      var hint = document.getElementById('usernameHint');
+      if (!val) { hint.textContent = ''; hint.className = 'form-hint'; return; }
+      if (!/^[\w\u4e00-\u9fff]{3,20}$/.test(val)) {
+        hint.textContent = '3-20字符，仅字母/数字/下划线/中文';
+        hint.className = 'form-hint error';
+        return;
+      }
+      hint.textContent = '检查中...';
+      hint.className = 'form-hint';
+      usernameTimer = setTimeout(function() {
+        Auth.checkUsername(val).then(function(data) {
+          if (data.available) {
+            hint.textContent = '✓ 用户名可用';
+            hint.className = 'form-hint success';
+          } else {
+            hint.textContent = '✗ 用户名已被占用';
+            hint.className = 'form-hint error';
+          }
+        }).catch(function() {
+          hint.textContent = '';
+        });
+      }, 500);
+    });
+
+    // --- Email check ---
+    document.getElementById('regEmail').addEventListener('blur', function() {
+      var val = this.value.trim();
+      var hint = document.getElementById('emailHint');
+      if (!val) { hint.textContent = ''; return; }
+      if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(val)) {
+        hint.textContent = '邮箱格式不正确';
+        hint.className = 'form-hint error';
+        return;
+      }
+      hint.textContent = '检查中...';
+      hint.className = 'form-hint';
+      Auth.checkEmail(val).then(function(data) {
+        if (data.available) {
+          hint.textContent = '✓ 邮箱可用';
+          hint.className = 'form-hint success';
+        } else {
+          hint.textContent = '✗ 邮箱已注册';
+          hint.className = 'form-hint error';
+        }
+      }).catch(function() {
+        hint.textContent = '';
+      });
+    });
+
+    // --- Password strength ---
+    document.getElementById('regPassword').addEventListener('input', function() {
+      var val = this.value;
+      var bar = document.getElementById('strengthBar');
+      var text = document.getElementById('strengthText');
+      if (!val) { bar.style.width = '0'; text.textContent = ''; text.className = 'form-hint'; return; }
+      var score = 0;
+      if (val.length >= 8) score++;
+      if (val.length >= 12) score++;
+      if (/[a-z]/.test(val) && /[A-Z]/.test(val)) score++;
+      if (/\d/.test(val)) score++;
+      if (/[^a-zA-Z0-9]/.test(val)) score++;
+      var levels = ['', '弱', '较弱', '中', '较强', '强'];
+      var colors = ['', '#f44336', '#ff9800', '#ff9800', '#4caf50', '#4caf50'];
+      var widths = ['0%', '20%', '40%', '60%', '80%', '100%'];
+      bar.style.width = widths[score];
+      bar.style.background = colors[score];
+      text.textContent = levels[score];
+      text.className = 'form-hint ' + (score <= 1 ? 'error' : score <= 2 ? '' : 'success');
+      checkConfirm();
+    });
+
+    // --- Confirm password ---
+    document.getElementById('regPasswordConfirm').addEventListener('input', checkConfirm);
+
+    function checkConfirm() {
+      var pwd = document.getElementById('regPassword').value;
+      var confirm = document.getElementById('regPasswordConfirm').value;
+      var hint = document.getElementById('confirmHint');
+      if (!confirm) { hint.textContent = ''; hint.className = 'form-hint'; return; }
+      if (pwd === confirm) {
+        hint.textContent = '✓ 密码一致';
+        hint.className = 'form-hint success';
+      } else {
+        hint.textContent = '✗ 密码不一致';
+        hint.className = 'form-hint error';
+      }
+    }
+
+    // --- Login ---
+    window.handleLogin = function(e) {
+      e.preventDefault();
+      var errorEl = document.getElementById('loginError');
+      var btn = document.getElementById('loginBtn');
+      errorEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = '登录中...';
+      var loginVal = document.getElementById('loginInput').value.trim();
+      var password = document.getElementById('loginPassword').value;
+      Auth.login(loginVal, password).then(function() {
+        var redirect = localStorage.getItem('login_redirect') || '/';
+        localStorage.removeItem('login_redirect');
+        window.location.href = redirect;
+      }).catch(function(err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = '';
+        btn.disabled = false;
+        btn.textContent = '登录';
+      });
+    };
+
+    // --- Register ---
+    window.handleRegister = function(e) {
+      e.preventDefault();
+      var errorEl = document.getElementById('registerError');
+      var btn = document.getElementById('registerBtn');
+      errorEl.style.display = 'none';
+      var username = document.getElementById('regUsername').value.trim();
+      var email = document.getElementById('regEmail').value.trim();
+      var password = document.getElementById('regPassword').value;
+      var confirm = document.getElementById('regPasswordConfirm').value;
+
+      if (!/^[\w\u4e00-\u9fff]{3,20}$/.test(username)) {
+        errorEl.textContent = '用户名格式不正确'; errorEl.style.display = ''; return;
+      }
+      if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+        errorEl.textContent = '邮箱格式不正确'; errorEl.style.display = ''; return;
+      }
+      if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+        errorEl.textContent = '密码至少8位，需含大小写字母和数字'; errorEl.style.display = ''; return;
+      }
+      if (password !== confirm) {
+        errorEl.textContent = '两次密码不一致'; errorEl.style.display = ''; return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = '注册中...';
+      Auth.register(username, email, password).then(function() {
+        window.location.href = '/';
+      }).catch(function(err) {
+        errorEl.textContent = err.message;
+        errorEl.style.display = '';
+        btn.disabled = false;
+        btn.textContent = '注册';
+      });
+    };
+
+    // Init auth
+    Auth.init();
+  })();
+  </script>
+</body>
+</html>

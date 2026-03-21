@@ -18,7 +18,7 @@
   }
 
   function authHeaders() {
-    return {
+    return typeof Auth !== 'undefined' ? Auth.authHeaders() : {
       'Content-Type': 'application/json',
       'X-User-Token': getUserToken(),
     };

@@ -25,6 +25,7 @@
       <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
       <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
       <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+      <div id="navUserArea" class="nav-user-area"></div>
     </div>
   </header>
 
@@ -185,6 +186,8 @@
     <div class="footer-copyright">AI News Hub v1.0.0 · 用心搭建 ⚡</div>
   </main>
 
+  <script src="js/auth.js"></script>
+  Auth.init();
   <script>
     (function() {
       'use strict';

@@ -25,6 +25,7 @@
       <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
       <a href="/?search=" class="search-link-detail" id="searchLink" title="搜索新闻">🔍</a>
       <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+      <div id="navUserArea" class="nav-user-area"></div>
     </div>
   </header>
 
@@ -42,7 +43,9 @@
 
   <div class="footer-copyright">AI News Hub v1.0.0 · 用心搭建 ⚡</div>
 
+  <script src="js/auth.js"></script>
   <script>
+    Auth.init();
     // --- Article Detail Page Logic (v0.7.0 with bookmark + history) ---
     (function () {
       const API_BASE = '/api/v1';
@@ -59,9 +62,9 @@
       }
 
       function authHeaders() {
-        return {
-          'Content-Type': 'application/json',
-          'X-User-Token': getUserToken(),
+        return typeof Auth !== "undefined" ? Auth.authHeaders() : {
+          "Content-Type": "application/json",
+          "X-User-Token": getUserToken(),
         };
       }
 
