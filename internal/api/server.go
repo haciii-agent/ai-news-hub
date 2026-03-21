@@ -10,6 +10,7 @@ import (
 
 	"ai-news-hub/config"
 	"ai-news-hub/internal/ai"
+	"ai-news-hub/internal/auth"
 	"ai-news-hub/internal/collector"
 	"ai-news-hub/internal/classifier"
 	"ai-news-hub/internal/store"
@@ -18,15 +19,19 @@ import (
 
 // Server holds all dependencies for the HTTP server.
 type Server struct {
-	DB           *sql.DB
-	Cfg          *config.Config
-	Store        store.ArticleStore
-	UserStore    store.UserStore
-	ProfileStore store.ProfileStore
-	CollectSvc   *CollectService
-	Classifier   *classifier.Manager
-	Summarizer   *ai.Summarizer
-	Version      string
+	DB              *sql.DB
+	Cfg             *config.Config
+	Store           store.ArticleStore
+	UserStore       store.UserStore
+	ProfileStore    store.ProfileStore
+	AuthMgr         *auth.AuthManager
+	AuthStore       store.AuthStore
+	LoginLogStore   store.LoginLogStore
+	AdminMgr        store.AdminStore // Worker-B will populate this
+	CollectSvc      *CollectService
+	Classifier      *classifier.Manager
+	Summarizer      *ai.Summarizer
+	Version         string
 }
 
 // NewServer creates a fully-wired HTTP server with all routes registered.
@@ -69,6 +74,15 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 
 	// Initialize profile store (v1.0.0)
 	srv.initProfileStore(db)
+
+	// Initialize auth system (v1.2.0)
+	authStore := store.NewAuthStore(db)
+	loginLogStore := store.NewLoginLogStore(db)
+	authMgr := auth.NewAuthManager(cfg.Auth, authStore)
+	srv.AuthStore = authStore
+	srv.LoginLogStore = loginLogStore
+	srv.AuthMgr = authMgr
+	log.Println("[api] auth system initialized (JWT enabled)")
 
 	return srv, nil
 }
@@ -123,13 +137,30 @@ func (s *Server) Handler() http.Handler {
 		}
 	})
 	mux.HandleFunc("/api/v1/user/streak", s.HandleReadingStreak)
+	mux.HandleFunc("/api/v1/user/password", s.HandleUpdatePassword)
+
+	// Auth routes (v1.2.0)
+	mux.HandleFunc("/api/v1/auth/register", s.HandleRegister)
+	mux.HandleFunc("/api/v1/auth/login", s.HandleLogin)
+	mux.HandleFunc("/api/v1/auth/me", s.HandleMe)
+	mux.HandleFunc("/api/v1/auth/refresh", s.HandleRefresh)
+	mux.HandleFunc("/api/v1/auth/logout", s.HandleLogout)
+	mux.HandleFunc("/api/v1/auth/check-username", s.HandleCheckUsername)
+	mux.HandleFunc("/api/v1/auth/check-email", s.HandleCheckEmail)
+
+	// Admin routes (v1.2.0) — handlers implemented by Worker-B
+	mux.HandleFunc("/api/v1/admin/users", s.HandleAdminListUsers)
+	mux.HandleFunc("/api/v1/admin/users/", s.adminRouter)
 
 	// Static files (embed.FS) — serve at root, API takes precedence
 	staticFS := http.FileServer(http.FS(static.FS()))
 	mux.Handle("/", staticFS)
 
+	// Apply global auth middleware (injects user info into context, does not block)
+	globalAuth := s.AuthMgr.AuthMiddleware(mux)
+
 	// Apply CORS middleware (development: AllowAll)
-	handler := corsMiddleware(mux)
+	handler := corsMiddleware(globalAuth)
 
 	log.Println("[api] routes registered:")
 	log.Println("  GET  /health")

@@ -5,6 +5,9 @@
 package main
 
 import (
+	"database/sql"
+	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +17,7 @@ import (
 
 	"ai-news-hub/config"
 	"ai-news-hub/internal/api"
+	"ai-news-hub/internal/auth"
 	"ai-news-hub/internal/store"
 )
 
@@ -21,6 +25,12 @@ import (
 var version = "dev"
 
 func main() {
+	// Handle admin CLI subcommands
+	if len(os.Args) >= 2 && os.Args[1] == "admin" {
+		handleAdminCommand(os.Args[2:])
+		return
+	}
+
 	// Determine config path (default: ./config/config.yaml).
 	configPath := "config/config.yaml"
 	if env := os.Getenv("NEWS_HUB_CONFIG"); env != "" {
@@ -75,4 +85,130 @@ func main() {
 		log.Fatalf("[main] server error: %v", err)
 	}
 	log.Println("[main] server stopped")
+}
+
+// handleAdminCommand processes admin CLI subcommands.
+func handleAdminCommand(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "Usage: ai-news-hub admin <command>")
+		fmt.Fprintln(os.Stderr, "Commands:")
+		fmt.Fprintln(os.Stderr, "  create-user  Create a new admin user")
+		os.Exit(1)
+	}
+
+	switch args[0] {
+	case "create-user":
+		handleCreateUser(args[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown admin command: %s\n", args[0])
+		os.Exit(1)
+	}
+}
+
+// handleCreateUser implements the "admin create-user" CLI subcommand.
+func handleCreateUser(args []string) {
+	fs := flag.NewFlagSet("create-user", flag.ExitOnError)
+	username := fs.String("username", "", "Username (required)")
+	email := fs.String("email", "", "Email (required)")
+	password := fs.String("password", "", "Password (required)")
+	role := fs.String("role", "admin", "User role (admin/editor/viewer)")
+	dbPath := fs.String("db", "./data/news.db", "Database path")
+	fs.Parse(args)
+
+	if *username == "" || *email == "" || *password == "" {
+		fmt.Fprintln(os.Stderr, "Error: --username, --email, and --password are required")
+		fs.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// Validate role
+	validRoles := map[string]bool{"admin": true, "editor": true, "viewer": true}
+	if !validRoles[*role] {
+		fmt.Fprintf(os.Stderr, "Error: invalid role %q (must be admin/editor/viewer)\n", *role)
+		os.Exit(1)
+	}
+
+	// Open database
+	dsn := fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000", *dbPath)
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to open database: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Run migrations
+	if err := db.Ping(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Use a simple config for auth
+	authCfg := config.AuthConfig{BcryptCost: 10}
+
+	// Create stores
+	authStore := store.NewAuthStore(db)
+
+	// Check uniqueness
+	exists, err := authStore.CheckUsernameExists(*username)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to check username: %v\n", err)
+		os.Exit(1)
+	}
+	if exists {
+		fmt.Fprintf(os.Stderr, "Error: username %q already exists\n", *username)
+		os.Exit(1)
+	}
+
+	exists, err = authStore.CheckEmailExists(*email)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to check email: %v\n", err)
+		os.Exit(1)
+	}
+	if exists {
+		fmt.Fprintf(os.Stderr, "Error: email %q already registered\n", *email)
+		os.Exit(1)
+	}
+
+	// Hash password
+	passwordHash, err := auth.HashPassword(*password, authCfg.BcryptCost)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to hash password: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create user in transaction
+	tx, err := db.Begin()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to begin transaction: %v\n", err)
+		os.Exit(1)
+	}
+	defer tx.Rollback()
+
+	user, err := authStore.CreateUser(tx, *username, *email, passwordHash)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to create user: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Override role if not admin (CreateUser always sets 'viewer')
+	if *role != "viewer" {
+		_, err = tx.Exec(`UPDATE users SET role = ? WHERE id = ?`, *role, user.ID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to set role: %v\n", err)
+			os.Exit(1)
+		}
+		user.Role = *role
+	}
+
+	if err := tx.Commit(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to commit transaction: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✅ User created successfully!\n")
+	fmt.Printf("   ID:       %d\n", user.ID)
+	fmt.Printf("   Username: %s\n", *username)
+	fmt.Printf("   Email:    %s\n", *email)
+	fmt.Printf("   Role:     %s\n", *role)
 }

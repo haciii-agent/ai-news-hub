@@ -9,10 +9,16 @@ import (
 
 // User 用户数据模型
 type User struct {
-	ID         int64  `json:"id"`
-	Token      string `json:"token"`
-	CreatedAt  string `json:"created_at"`
-	LastSeenAt string `json:"last_seen_at"`
+	ID           int64   `json:"id"`
+	Token        string  `json:"token,omitempty"`
+	Username     *string `json:"username,omitempty"`
+	Email        *string `json:"email,omitempty"`
+	PasswordHash string  `json:"-"`
+	Role         string  `json:"role"`
+	Disabled     bool    `json:"disabled"`
+	MergedInto   *int64  `json:"merged_into,omitempty"`
+	CreatedAt    string  `json:"created_at"`
+	LastSeenAt   string  `json:"last_seen_at"`
 }
 
 // UserStore 用户相关存储接口
@@ -52,8 +58,13 @@ func (s *userStore) GetOrCreateUserByToken(token string) (*User, bool, error) {
 	// Try to find existing user
 	var u User
 	err := s.db.QueryRow(
-		`SELECT id, token, created_at, last_seen_at FROM users WHERE token = ?`, token,
-	).Scan(&u.ID, &u.Token, &u.CreatedAt, &u.LastSeenAt)
+		`SELECT id, token, COALESCE(username, NULL), COALESCE(email, NULL),
+		        COALESCE(password_hash, ''), COALESCE(role, 'anonymous'),
+		        COALESCE(disabled, 0), COALESCE(merged_into, NULL),
+		        created_at, last_seen_at
+		 FROM users WHERE token = ?`, token,
+	).Scan(&u.ID, &u.Token, &u.Username, &u.Email, &u.PasswordHash,
+		&u.Role, &u.Disabled, &u.MergedInto, &u.CreatedAt, &u.LastSeenAt)
 
 	if err == nil {
 		// User exists, update last_seen_at
@@ -78,6 +89,7 @@ func (s *userStore) GetOrCreateUserByToken(token string) (*User, bool, error) {
 	return &User{
 		ID:         id,
 		Token:      token,
+		Role:       "anonymous",
 		CreatedAt:  "", // will be populated on next query
 		LastSeenAt: "",
 	}, true, nil

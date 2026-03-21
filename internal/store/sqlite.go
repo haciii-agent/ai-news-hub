@@ -116,6 +116,56 @@ CREATE TRIGGER IF NOT EXISTS articles_fts_update AFTER UPDATE ON articles BEGIN
 END;
 `
 
+// userSystemSQL adds user system tables and columns for v1.2.0.
+// Uses ALTER TABLE ADD COLUMN (ignores duplicate column errors) and
+// CREATE TABLE IF NOT EXISTS / CREATE INDEX IF NOT EXISTS for idempotency.
+var userSystemSQL = `
+-- users table extensions
+ALTER TABLE users ADD COLUMN username TEXT;
+ALTER TABLE users ADD COLUMN email TEXT;
+ALTER TABLE users ADD COLUMN password_hash TEXT;
+ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'anonymous';
+ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN merged_into INTEGER DEFAULT NULL;
+
+-- indexes for users
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE username IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_disabled ON users(disabled);
+
+-- oauth_accounts table
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    provider_user_id TEXT NOT NULL,
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(provider, provider_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_user ON oauth_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_provider ON oauth_accounts(provider, provider_user_id);
+
+-- login_logs table
+CREATE TABLE IF NOT EXISTS login_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT,
+    ip_address TEXT,
+    user_agent TEXT,
+    success INTEGER NOT NULL DEFAULT 1,
+    fail_reason TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_login_logs_user ON login_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_login_logs_time ON login_logs(created_at DESC);
+`
+
 // NewDB opens (or creates) a SQLite database at dbPath, runs migrations,
 // and returns the *sql.DB handle.
 func NewDB(dbPath string) (*sql.DB, error) {
@@ -186,6 +236,13 @@ func migrate(db *sql.DB) error {
 			if !strings.Contains(err.Error(), "duplicate column") {
 				return fmt.Errorf("alter articles table: %w", err)
 			}
+		}
+	}
+
+	// 5. v1.2.0: User system migration
+	if _, err := db.Exec(userSystemSQL); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("exec user system migration: %w", err)
 		}
 	}
 

@@ -7,24 +7,21 @@ import (
 	"strconv"
 	"strings"
 
+	"ai-news-hub/internal/auth"
 	"ai-news-hub/internal/store"
 )
 
 // --- getUserID helper ---
 
-// getUserID extracts user token from X-User-Token header and returns the user ID.
-// Returns 0 if no token is provided (guest mode).
+// getUserID extracts user ID from the request context (set by AuthMiddleware).
+// Falls back to X-User-Token for backward compatibility with non-middleware paths.
+// Returns 0 if no user is identified (guest mode).
 func (s *Server) getUserID(r *http.Request) int64 {
-	token := r.Header.Get("X-User-Token")
-	if token == "" {
-		return 0
+	info := auth.GetUserInfo(r)
+	if info.UserID > 0 {
+		return info.UserID
 	}
-	user, _, err := s.UserStore.GetOrCreateUserByToken(token)
-	if err != nil {
-		log.Printf("[api] getUserID error: %v", err)
-		return 0
-	}
-	return user.ID
+	return 0
 }
 
 // --- User Init Handler ---

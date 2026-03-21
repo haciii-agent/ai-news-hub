@@ -15,7 +15,18 @@ type Config struct {
 	Collector  CollectorConfig  `yaml:"collector"`
 	Classifier ClassifierConfig `yaml:"classifier"`
 	AI         AIConfig         `yaml:"ai"`
+	Auth       AuthConfig       `yaml:"auth"`
 	Log        LogConfig        `yaml:"log"`
+}
+
+// AuthConfig holds authentication settings.
+type AuthConfig struct {
+	JWTSecret        string        `yaml:"jwt_secret"`
+	JWTExpiry        time.Duration `yaml:"jwt_expiry"`
+	BcryptCost       int           `yaml:"bcrypt_cost"`
+	MaxLoginAttempts int           `yaml:"max_login_attempts"`
+	LockoutDuration  time.Duration `yaml:"lockout_duration"`
+	RateLimitPerIP   int           `yaml:"rate_limit_per_ip"`
 }
 
 // AIConfig holds AI (LLM summarizer) settings.
@@ -132,6 +143,28 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.AI.Timeout == 0 {
 		cfg.AI.Timeout = 15 * time.Second
+	}
+
+	// Auth defaults
+	if cfg.Auth.JWTExpiry == 0 {
+		cfg.Auth.JWTExpiry = 168 * time.Hour
+	}
+	if cfg.Auth.BcryptCost == 0 {
+		cfg.Auth.BcryptCost = 10
+	}
+	if cfg.Auth.MaxLoginAttempts == 0 {
+		cfg.Auth.MaxLoginAttempts = 5
+	}
+	if cfg.Auth.LockoutDuration == 0 {
+		cfg.Auth.LockoutDuration = 5 * time.Minute
+	}
+	if cfg.Auth.RateLimitPerIP == 0 {
+		cfg.Auth.RateLimitPerIP = 10
+	}
+
+	// Environment variable overrides for auth
+	if env := os.Getenv("JWT_SECRET"); env != "" {
+		cfg.Auth.JWTSecret = env
 	}
 
 	return cfg, nil
