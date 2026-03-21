@@ -10,6 +10,7 @@ import (
 
 	"ai-news-hub/internal/collector"
 	"ai-news-hub/internal/classifier"
+	"ai-news-hub/internal/auth"
 	"ai-news-hub/internal/store"
 )
 
@@ -70,6 +71,12 @@ type StatsResponse struct {
 func (s *CollectService) HandleCollect(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "only POST allowed")
+		return
+	}
+
+	// Permission check: POST /api/v1/collect requires editor+
+	if err := auth.RequireRole(r, "admin", "editor"); err != nil {
+		writeError(w, http.StatusForbidden, "insufficient permissions")
 		return
 	}
 

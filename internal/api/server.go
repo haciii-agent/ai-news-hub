@@ -82,6 +82,7 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 	srv.AuthStore = authStore
 	srv.LoginLogStore = loginLogStore
 	srv.AuthMgr = authMgr
+	srv.AdminMgr = store.NewAdminStore(db)
 	log.Println("[api] auth system initialized (JWT enabled)")
 
 	return srv, nil

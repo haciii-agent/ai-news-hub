@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台 — AI News Hub</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">
+        <span class="logo-icon">📰</span>
+        <span>AI News <span class="logo-text-accent">Hub</span></span>
+      </a>
+      <span class="header-clock" id="headerClock"></span>
+    </div>
+    <div class="header-right">
+      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+      <a href="/admin.html" class="header-nav-link header-nav-link-active" title="管理后台">⚙️</a>
+      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+      <div id="navUserArea"></div>
+      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
+    </div>
+  </header>
+
+  <!-- Page Title Bar -->
+  <div class="page-title-bar">
+    <h1 class="page-title">⚙️ 管理后台</h1>
+    <span class="page-subtitle" id="adminSubtitle">用户管理与权限控制</span>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content" style="max-width: 1100px;">
+
+    <!-- Stats Bar -->
+    <div class="admin-stats" id="adminStats">
+      <div class="admin-stat-card">
+        <div class="admin-stat-value" id="totalUsers">-</div>
+        <div class="admin-stat-label">注册用户总数</div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-value" id="adminCount">-</div>
+        <div class="admin-stat-label">管理员</div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-value" id="editorCount">-</div>
+        <div class="admin-stat-label">编辑</div>
+      </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="admin-search-bar">
+      <input type="text" id="searchInput" placeholder="搜索用户名或邮箱..." class="admin-search-input">
+      <button class="admin-search-btn" id="searchBtn" onclick="AdminApp.search()">搜索</button>
+      <button class="admin-search-btn admin-search-btn-secondary" onclick="AdminApp.clearSearch()">清除</button>
+    </div>
+
+    <!-- User Table -->
+    <div class="admin-table-wrap">
+      <table class="admin-table" id="userTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>用户名</th>
+            <th>邮箱</th>
+            <th>角色</th>
+            <th>状态</th>
+            <th>注册时间</th>
+            <th>最后活跃</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="userTableBody">
+          <tr><td colspan="8" class="admin-table-empty">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="admin-pagination" id="pagination"></div>
+
+  </main>
+
+  <!-- User Detail Modal -->
+  <div class="admin-modal-overlay" id="detailModal" style="display:none;">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h2>用户详情</h2>
+        <button class="admin-modal-close" onclick="AdminApp.closeModal()">&times;</button>
+      </div>
+      <div class="admin-modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <style>
+    .admin-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .admin-stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+    .admin-stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .admin-stat-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .admin-search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .admin-search-input {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+    }
+    .admin-search-input:focus {
+      border-color: var(--accent);
+    }
+    .admin-search-btn {
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .admin-search-btn:hover { background: var(--accent-hover); }
+    .admin-search-btn-secondary {
+      background: var(--border);
+    }
+    .admin-search-btn-secondary:hover { background: var(--border-hover); }
+    .admin-table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .admin-table th {
+      background: var(--header-bg);
+      color: var(--text-secondary);
+      padding: 12px 14px;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .admin-table td {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+    .admin-table tr:hover td {
+      background: var(--info-bg);
+    }
+    .admin-table-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 40px !important;
+    }
+    .admin-role-select {
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .admin-status-toggle {
+      padding: 4px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .admin-status-toggle.enabled {
+      background: var(--success-bg);
+      color: var(--success);
+      border-color: var(--success);
+    }
+    .admin-status-toggle.disabled {
+      background: var(--error-bg);
+      color: var(--error);
+      border-color: var(--error);
+    }
+    .admin-action-btn {
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      margin-right: 4px;
+      transition: all 0.2s;
+    }
+    .admin-action-btn:hover {
+      background: var(--info-bg);
+      color: var(--text-primary);
+    }
+    .admin-pagination {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
+    }
+    .admin-page-btn {
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .admin-page-btn:hover { background: var(--info-bg); }
+    .admin-page-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .admin-page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    /* Modal */
+    .admin-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .admin-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 90%;
+      max-width: 560px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .admin-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-modal-header h2 {
+      font-size: 18px;
+      color: var(--text-primary);
+    }
+    .admin-modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+    }
+    .admin-modal-body {
+      padding: 20px;
+    }
+    .admin-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-detail-label {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+    .admin-detail-value {
+      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .admin-detail-section {
+      margin-top: 16px;
+    }
+    .admin-detail-section h3 {
+      font-size: 15px;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .admin-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      margin: 2px 4px;
+      border-radius: 12px;
+      font-size: 12px;
+      background: var(--info-bg);
+      color: var(--text-secondary);
+    }
+    @media (max-width: 768px) {
+      .admin-search-bar { flex-direction: column; }
+      .admin-table { font-size: 12px; }
+    }
+  </style>
+
+  <script>
+    const AdminApp = (function() {
+      const API_BASE = '/api/v1';
+      let currentPage = 1;
+      let perPage = 20;
+      let totalUsers = 0;
+      let currentSearch = '';
+
+      function authHeaders() {
+        if (typeof Auth !== 'undefined' && Auth.isLoggedIn()) {
+          return Auth.authHeaders();
+        }
+        return {
+          'Content-Type': 'application/json',
+          'X-User-Token': localStorage.getItem('user_token') || '',
+        };
+      }
+
+      async function checkAdmin() {
+        try {
+          const res = await fetch(API_BASE + '/auth/me', { headers: authHeaders() });
+          if (res.status === 401 || res.status === 403) {
+            window.location.href = '/';
+            return false;
+          }
+          const data = await res.json();
+          if (!data.user || data.user.role !== 'admin') {
+            window.location.href = '/';
+            return false;
+          }
+          return true;
+        } catch(e) {
+          console.error('Admin check failed:', e);
+          window.location.href = '/';
+          return false;
+        }
+      }
+
+      async function loadStats() {
+        try {
+          // Get user counts from the first page
+          const res = await fetch(API_BASE + '/admin/users?page=1&per_page=1', { headers: authHeaders() });
+          if (res.status === 403) { window.location.href = '/'; return; }
+          const data = await res.json();
+          document.getElementById('totalUsers').textContent = data.total || '-';
+
+          // Get role counts
+          const allRes = await fetch(API_BASE + '/admin/users?per_page=1000', { headers: authHeaders() });
+          const allData = await allRes.json();
+          let adminC = 0, editorC = 0;
+          if (allData.users) {
+            allData.users.forEach(u => {
+              if (u.role === 'admin') adminC++;
+              if (u.role === 'editor') editorC++;
+            });
+          }
+          document.getElementById('adminCount').textContent = adminC;
+          document.getElementById('editorCount').textContent = editorC;
+        } catch(e) {
+          console.error('Failed to load stats:', e);
+        }
+      }
+
+      async function loadUsers() {
+        const tbody = document.getElementById('userTableBody');
+        tbody.innerHTML = '<tr><td colspan="8" class="admin-table-empty">加载中...</td></tr>';
+
+        let url = API_BASE + '/admin/users?page=' + currentPage + '&per_page=' + perPage;
+        if (currentSearch) url += '&search=' + encodeURIComponent(currentSearch);
+
+        try {
+          const res = await fetch(url, { headers: authHeaders() });
+          if (res.status === 403) { window.location.href = '/'; return; }
+          const data = await res.json();
+
+          totalUsers = data.total || 0;
+          const users = data.users || [];
+
+          if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="admin-table-empty">没有找到用户</td></tr>';
+            renderPagination();
+            return;
+          }
+
+          tbody.innerHTML = users.map(u => renderRow(u)).join('');
+          renderPagination();
+        } catch(e) {
+          tbody.innerHTML = '<tr><td colspan="8" class="admin-table-empty">加载失败: ' + escapeHtml(e.message) + '</td></tr>';
+        }
+      }
+
+      function renderRow(u) {
+        const username = u.username || '(匿名)';
+        const email = u.email || '-';
+        const role = u.role || 'anonymous';
+        const disabled = u.disabled ? 'disabled' : 'enabled';
+        const statusText = u.disabled ? '已禁用' : '正常';
+
+        return '<tr>' +
+          '<td>' + u.id + '</td>' +
+          '<td>' + escapeHtml(username) + '</td>' +
+          '<td>' + escapeHtml(email) + '</td>' +
+          '<td>' +
+            '<select class="admin-role-select" data-id="' + u.id + '" data-current="' + role + '" onchange="AdminApp.changeRole(this)">' +
+              '<option value="viewer"' + (role === 'viewer' ? ' selected' : '') + '>viewer</option>' +
+              '<option value="editor"' + (role === 'editor' ? ' selected' : '') + '>editor</option>' +
+              '<option value="admin"' + (role === 'admin' ? ' selected' : '') + '>admin</option>' +
+              '<option value="anonymous"' + (role === 'anonymous' ? ' selected' : '') + '>anonymous</option>' +
+            '</select>' +
+          '</td>' +
+          '<td><button class="admin-status-toggle ' + disabled + '" data-id="' + u.id + '" data-disabled="' + u.disabled + '" onclick="AdminApp.toggleStatus(this)">' + statusText + '</button></td>' +
+          '<td>' + formatDate(u.created_at) + '</td>' +
+          '<td>' + formatDate(u.last_seen_at) + '</td>' +
+          '<td><button class="admin-action-btn" onclick="AdminApp.showDetail(' + u.id + ')">详情</button></td>' +
+        '</tr>';
+      }
+
+      function renderPagination() {
+        const totalPages = Math.ceil(totalUsers / perPage);
+        if (totalPages <= 1) {
+          document.getElementById('pagination').innerHTML = '';
+          return;
+        }
+
+        let html = '';
+        html += '<button class="admin-page-btn" ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="AdminApp.goPage(' + (currentPage - 1) + ')">上一页</button>';
+
+        let start = Math.max(1, currentPage - 2);
+        let end = Math.min(totalPages, start + 4);
+        if (end - start < 4) start = Math.max(1, end - 4);
+
+        for (let i = start; i <= end; i++) {
+          html += '<button class="admin-page-btn' + (i === currentPage ? ' active' : '') + '" onclick="AdminApp.goPage(' + i + ')">' + i + '</button>';
+        }
+
+        html += '<button class="admin-page-btn" ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="AdminApp.goPage(' + (currentPage + 1) + ')">下一页</button>';
+        document.getElementById('pagination').innerHTML = html;
+      }
+
+      async function changeRole(selectEl) {
+        const id = selectEl.dataset.id;
+        const newRole = selectEl.value;
+        const oldRole = selectEl.dataset.current;
+
+        if (newRole === oldRole) return;
+        if (!confirm('确定将用户 #' + id + ' 的角色改为 ' + newRole + '？')) {
+          selectEl.value = oldRole;
+          return;
+        }
+
+        try {
+          const res = await fetch(API_BASE + '/admin/users/' + id + '/role', {
+            method: 'PUT',
+            headers: authHeaders(),
+            body: JSON.stringify({ role: newRole }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            selectEl.dataset.current = newRole;
+            loadStats();
+          } else {
+            alert(data.message || '操作失败');
+            selectEl.value = oldRole;
+          }
+        } catch(e) {
+          alert('请求失败: ' + e.message);
+          selectEl.value = oldRole;
+        }
+      }
+
+      async function toggleStatus(btn) {
+        const id = btn.dataset.id;
+        const currentlyDisabled = btn.dataset.disabled === 'true';
+        const newDisabled = !currentlyDisabled;
+
+        if (newDisabled && !confirm('确定禁用用户 #' + id + '？')) return;
+
+        try {
+          const res = await fetch(API_BASE + '/admin/users/' + id + '/status', {
+            method: 'PUT',
+            headers: authHeaders(),
+            body: JSON.stringify({ disabled: newDisabled }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            btn.dataset.disabled = String(newDisabled);
+            btn.className = 'admin-status-toggle ' + (newDisabled ? 'disabled' : 'enabled');
+            btn.textContent = newDisabled ? '已禁用' : '正常';
+          } else {
+            alert(data.message || '操作失败');
+          }
+        } catch(e) {
+          alert('请求失败: ' + e.message);
+        }
+      }
+
+      async function showDetail(id) {
+        const modal = document.getElementById('detailModal');
+        const body = document.getElementById('modalBody');
+        body.innerHTML = '<p style="color:var(--text-muted);">加载中...</p>';
+        modal.style.display = 'flex';
+
+        try {
+          const res = await fetch(API_BASE + '/admin/users/' + id, { headers: authHeaders() });
+          const data = await res.json();
+          if (!res.ok) {
+            body.innerHTML = '<p style="color:var(--error);">' + escapeHtml(data.message || '加载失败') + '</p>';
+            return;
+          }
+
+          let html = '';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">ID</span><span class="admin-detail-value">' + data.id + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">用户名</span><span class="admin-detail-value">' + escapeHtml(data.username || '(匿名)') + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">邮箱</span><span class="admin-detail-value">' + escapeHtml(data.email || '-') + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">角色</span><span class="admin-detail-value">' + escapeHtml(data.role) + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">状态</span><span class="admin-detail-value">' + (data.disabled ? '已禁用' : '正常') + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">注册时间</span><span class="admin-detail-value">' + formatDate(data.created_at) + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">最后活跃</span><span class="admin-detail-value">' + formatDate(data.last_seen_at) + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">收藏数</span><span class="admin-detail-value">' + (data.total_bookmarks || 0) + '</span></div>';
+          html += '<div class="admin-detail-row"><span class="admin-detail-label">阅读数</span><span class="admin-detail-value">' + (data.total_reads || 0) + '</span></div>';
+
+          if (data.profile) {
+            html += '<div class="admin-detail-section"><h3>兴趣标签</h3>';
+            if (data.profile.interests) {
+              const tags = Object.entries(data.profile.interests).sort((a,b) => b[1] - a[1]).slice(0, 15);
+              tags.forEach(([tag, weight]) => {
+                html += '<span class="admin-tag">' + escapeHtml(tag) + ' (' + (weight * 100).toFixed(0) + '%)</span>';
+              });
+            } else {
+              html += '<span style="color:var(--text-muted);">暂无数据</span>';
+            }
+            html += '</div>';
+
+            html += '<div class="admin-detail-section"><h3>偏好分类</h3>';
+            if (data.profile.preferred_categories && data.profile.preferred_categories.length > 0) {
+              data.profile.preferred_categories.forEach(cat => {
+                html += '<span class="admin-tag">' + escapeHtml(cat) + '</span>';
+              });
+            } else {
+              html += '<span style="color:var(--text-muted);">暂无数据</span>';
+            }
+            html += '</div>';
+          }
+
+          body.innerHTML = html;
+        } catch(e) {
+          body.innerHTML = '<p style="color:var(--error);">请求失败: ' + escapeHtml(e.message) + '</p>';
+        }
+      }
+
+      function closeModal() {
+        document.getElementById('detailModal').style.display = 'none';
+      }
+
+      function search() {
+        currentSearch = document.getElementById('searchInput').value.trim();
+        currentPage = 1;
+        loadUsers();
+      }
+
+      function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        currentSearch = '';
+        currentPage = 1;
+        loadUsers();
+      }
+
+      function goPage(page) {
+        currentPage = page;
+        loadUsers();
+      }
+
+      function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        try {
+          const d = new Date(dateStr);
+          return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        } catch(e) {
+          return dateStr;
+        }
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      async function init() {
+        const isAdmin = await checkAdmin();
+        if (!isAdmin) return;
+        loadStats();
+        loadUsers();
+
+        // Enter key for search
+        document.getElementById('searchInput').addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') search();
+        });
+
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const saved = localStorage.getItem('theme');
+        if (saved === 'light') {
+          document.documentElement.classList.add('light');
+          themeToggle.textContent = '☀️';
+        }
+        themeToggle.addEventListener('click', function() {
+          document.documentElement.classList.toggle('light');
+          const isLight = document.documentElement.classList.contains('light');
+          themeToggle.textContent = isLight ? '☀️' : '🌙';
+          localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        });
+
+        // Clock
+        function updateClock() {
+          const now = new Date();
+          const el = document.getElementById('headerClock');
+          if (el) el.textContent = now.toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', weekday:'short' });
+        }
+        updateClock();
+        setInterval(updateClock, 30000);
+
+        // Close modal on overlay click
+        document.getElementById('detailModal').addEventListener('click', function(e) {
+          if (e.target === this) closeModal();
+        });
+        // Close modal on ESC
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') closeModal();
+        });
+
+        // Init Auth UI if available
+        if (typeof Auth !== 'undefined') {
+          Auth.init();
+        }
+      }
+
+      return {
+        init, search, clearSearch, changeRole, toggleStatus, showDetail, closeModal, goPage
+      };
+    })();
+
+    document.addEventListener('DOMContentLoaded', AdminApp.init);
+  </script>
+
+</body>
+</html>

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ai-news-hub/internal/ai"
+	"ai-news-hub/internal/auth"
 	"ai-news-hub/internal/store"
 )
 
@@ -253,12 +254,24 @@ func (s *Server) aiRouter(w http.ResponseWriter, r *http.Request) {
 
 	switch {
 	case rest == "generate-summaries":
+		if err := auth.RequireRole(r, "admin", "editor"); err != nil {
+			writeError(w, http.StatusForbidden, "insufficient permissions")
+			return
+		}
 		s.HandleAIGenerateSummaries(w, r)
 	case rest == "recalculate-scores":
+		if err := auth.RequireRole(r, "admin", "editor"); err != nil {
+			writeError(w, http.StatusForbidden, "insufficient permissions")
+			return
+		}
 		s.HandleAIRecalculateScores(w, r)
 	case rest == "summary-status":
 		s.HandleAISummaryStatus(w, r)
 	case strings.HasPrefix(rest, "generate-summary/"):
+		if err := auth.RequireRole(r, "admin", "editor"); err != nil {
+			writeError(w, http.StatusForbidden, "insufficient permissions")
+			return
+		}
 		s.HandleAIGenerateSingleSummary(w, r)
 	default:
 		writeError(w, http.StatusNotFound, "AI endpoint not found")
