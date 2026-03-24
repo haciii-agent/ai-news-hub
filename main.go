@@ -14,10 +14,12 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"ai-news-hub/config"
 	"ai-news-hub/internal/api"
 	"ai-news-hub/internal/auth"
+	"ai-news-hub/internal/collector"
 	"ai-news-hub/internal/store"
 )
 
@@ -72,12 +74,53 @@ func main() {
 	}
 
 	// Graceful shutdown.
+	shutdownCh := make(chan struct{})
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		log.Println("[main] shutting down...")
+		close(shutdownCh)
 		httpSrv.Close()
+	}()
+
+	// 定时采集调度器：启动后立即执行一次，之后每4小时执行一次。
+	collectScheduler := collector.NewCollectScheduler(&cfg.Collector)
+	go func() {
+		log.Println("[scheduler] 启动定时采集调度器，周期：4小时")
+		// 启动后立即执行一次
+		log.Println("[scheduler] 执行首次采集...")
+		results := collectScheduler.CollectAll()
+		var totalArticles, totalErr int
+		for _, r := range results {
+			totalArticles += len(r.Articles)
+			if r.Err != nil {
+				totalErr++
+			}
+		}
+		log.Printf("[scheduler] 首次采集完成：采集 %d 篇，失败 %d 个源", totalArticles, totalErr)
+
+		// 每4小时执行一次
+		ticker := time.NewTicker(4 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				log.Println("[scheduler] 触发定时采集...")
+				results := collectScheduler.CollectAll()
+				var totalArticles, totalErr int
+				for _, r := range results {
+					totalArticles += len(r.Articles)
+					if r.Err != nil {
+						totalErr++
+					}
+				}
+				log.Printf("[scheduler] 定时采集完成：采集 %d 篇，失败 %d 个源", totalArticles, totalErr)
+			case <-shutdownCh:
+				log.Println("[scheduler] 收到关闭信号，退出")
+				return
+			}
+		}
 	}()
 
 	log.Printf("[main] 🚀 ai-news-hub ready — listening on %s", addr)

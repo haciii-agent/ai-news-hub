@@ -19,7 +19,9 @@ type Source struct {
 
 // DefaultRSSSources RSS/Atom 数据源注册表。
 // 英文源仅保留 HackerNews、The Verge AI、HuggingFace Blog。
+// 中文源：36氪、InfoQ、雷锋网、虎嗅、钛媒体、思否、AI工具集
 var DefaultRSSSources = []Source{
+	// --- 英文源（仅保留 3 个）---
 	{
 		Name:       "Hacker News",
 		URL:        "https://hnrss.org/frontpage",
@@ -41,6 +43,8 @@ var DefaultRSSSources = []Source{
 		Categories: []string{"AI/ML", "开源生态"},
 		Language:   "en",
 	},
+
+	// --- 中文源 ---
 	{
 		Name:       "36氪",
 		URL:        "https://36kr.com/feed",
@@ -56,20 +60,6 @@ var DefaultRSSSources = []Source{
 		Language:   "zh",
 	},
 	{
-		Name:       "少数派",
-		URL:        "https://sspai.com/feed",
-		Type:       "rss",
-		Categories: []string{"科技前沿", "产品发布"},
-		Language:   "zh",
-	},
-	{
-		Name:       "极客公园",
-		URL:        "https://geekpark.net/rss",
-		Type:       "rss",
-		Categories: []string{"商业动态", "AI/ML", "科技前沿"},
-		Language:   "zh",
-	},
-	{
 		Name:       "雷锋网",
 		URL:        "https://www.leiphone.com/feed",
 		Type:       "rss",
@@ -77,28 +67,35 @@ var DefaultRSSSources = []Source{
 		Language:   "zh",
 	},
 	{
-		Name:       "CSDN AI",
-		URL:        "https://blog.csdn.net/nav/ai",
+		Name:       "虎嗅",
+		URL:        "https://www.huxiu.com/rss/0.xml",
 		Type:       "rss",
-		Categories: []string{"AI/ML", "科技前沿"},
+		Categories: []string{"商业动态", "科技前沿", "AI/ML"},
+		Language:   "zh",
+	},
+	{
+		Name:       "钛媒体",
+		URL:        "https://www.tmtpost.com/rss",
+		Type:       "rss",
+		Categories: []string{"商业动态", "产品发布", "科技前沿"},
+		Language:   "zh",
+	},
+	{
+		Name:       "少数派",
+		URL:        "https://sspai.com/feed",
+		Type:       "rss",
+		Categories: []string{"科技前沿", "产品发布", "效率工具"},
 		Language:   "zh",
 	},
 }
 
 // ---------------------------------------------------------------------------
-// HTML 降级数据源注册表（T003 扩展）
+// HTML 降级数据源注册表
 // ---------------------------------------------------------------------------
 
 // DefaultHTMLSources HTML 降级采集数据源注册表。
 // 这些站点没有稳定的 RSS feed，需要 HTML 列表页抓取。
 var DefaultHTMLSources = []Source{
-	{
-		Name:       "机器之心",
-		URL:        "https://www.jiqizhixin.com/",
-		Type:       "html",
-		Categories: []string{"AI/ML", "科技前沿", "学术研究"},
-		Language:   "zh",
-	},
 	{
 		Name:       "量子位",
 		URL:        "https://www.qbitai.com/",
@@ -151,7 +148,6 @@ func AllSources() []Source {
 // DefaultHTMLParsers 返回 HTML 源对应的默认解析器集合。
 func DefaultHTMLParsers() map[string]HTMLParser {
 	return map[string]HTMLParser{
-		"机器之心": NewJiqizhixinParser(),
-		"量子位":  &QbitaiParser{},
+		"量子位": &QbitaiParser{},
 	}
 }
