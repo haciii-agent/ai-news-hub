@@ -89,7 +89,8 @@ func (m *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 1. Try JWT from Authorization: Bearer <token>
 		authHeader := r.Header.Get("Authorization")
-		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		hasJWT := len(authHeader) > 7 && authHeader[:7] == "Bearer "
+		if hasJWT {
 			tokenStr := authHeader[7:]
 			claims, err := m.ValidateToken(tokenStr)
 			if err == nil {
@@ -110,6 +111,9 @@ func (m *AuthManager) AuthMiddleware(next http.Handler) http.Handler {
 					return
 				}
 			}
+			// JWT was provided but invalid → return 401, do NOT fall through to anon token
+			writeAuthError(w, http.StatusUnauthorized, "token invalid or expired")
+			return
 		}
 
 		// 2. Try anonymous token from X-User-Token

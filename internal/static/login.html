@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,15 +17,12 @@
           <span>AI News <span class="logo-text-accent">Hub</span></span>
         </a>
       </div>
-      <div class="header-right">
-        <button class="theme-toggle" @click="toggleTheme">{{ store.theme === 'dark' ? '☀️' : '🌙' }}</button>
-      </div>
+      <div class="header-right"></div>
     </header>
 
-    <!-- Auth Card -->
+    <!-- Auth -->
     <main class="auth-main">
       <div class="auth-card">
-        <!-- Tabs -->
         <div class="auth-tabs">
           <button class="auth-tab" :class="{ active: tab === 'login' }" @click="tab = 'login'">登录</button>
           <button class="auth-tab" :class="{ active: tab === 'register' }" @click="tab = 'register'">注册</button>
@@ -75,7 +72,11 @@
         </form>
       </div>
     </main>
+
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
   </div>
+
+  <div id="toast"></div>
 
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="js/store.js"></script>
@@ -84,11 +85,8 @@
   createApp({
     setup() {
       const S = window.aiNewsHub;
-      const store = S.store;
-
       const tab = ref(new URLSearchParams(location.search).get('tab') === 'register' ? 'register' : 'login');
 
-      // Login
       const loginVal = ref('');
       const loginPwd = ref('');
       const loginError = ref('');
@@ -100,9 +98,8 @@
         loading.value = true;
         try {
           const data = await S.login(loginVal.value, loginPwd.value);
-          if (data.error) {
-            loginError.value = data.message || '登录失败';
-          } else {
+          if (data.error) { loginError.value = data.message || '登录失败'; }
+          else {
             S.setJWT(data.token.access_token, data.token.expires_in);
             S.store.currentUser = data.user;
             S.store.isLoggedIn = true;
@@ -111,18 +108,14 @@
             localStorage.removeItem('login_redirect');
             location.href = redirect;
           }
-        } finally {
-          loading.value = false;
-        }
+        } finally { loading.value = false; }
       }
 
-      // Register
       const regUsername = ref('');
       const regEmail = ref('');
       const regPwd = ref('');
       const regPwd2 = ref('');
       const regError = ref('');
-
       const usernameHint = reactive({ text: '', class: '' });
       const emailHint = reactive({ text: '', class: '' });
       const confirmHint = reactive({ text: '', class: '' });
@@ -171,19 +164,15 @@
         const levels = ['', '弱', '较弱', '中', '较强', '强'];
         const colors = ['', '#f44336', '#ff9800', '#ff9800', '#4caf50', '#4caf50'];
         const widths = [0, 20, 40, 60, 80, 100];
-        strength.score = score;
-        strength.w = widths[score];
-        strength.color = colors[score];
+        strength.score = score; strength.w = widths[score]; strength.color = colors[score];
         strength.text = levels[score];
         strength.class = score <= 1 ? 'error' : score <= 2 ? '' : 'success';
         checkConfirm();
       }
 
       function checkConfirm() {
-        const pwd = regPwd.value;
-        const confirm = regPwd2.value;
-        if (!confirm) { confirmHint.text = ''; return; }
-        if (pwd === confirm) { confirmHint.text = '✓ 密码一致'; confirmHint.class = 'success'; }
+        if (!regPwd2.value) { confirmHint.text = ''; return; }
+        if (regPwd.value === regPwd2.value) { confirmHint.text = '✓ 密码一致'; confirmHint.class = 'success'; }
         else { confirmHint.text = '✗ 密码不一致'; confirmHint.class = 'error'; }
       }
 
@@ -192,15 +181,12 @@
         const username = regUsername.value.trim();
         const email = regEmail.value.trim();
         const password = regPwd.value;
-        const confirm = regPwd2.value;
-
         if (!/^[\w\u4e00-\u9fff]{3,20}$/.test(username)) { regError.value = '用户名格式不正确'; return; }
         if (!/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) { regError.value = '邮箱格式不正确'; return; }
         if (password.length < 8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
           regError.value = '密码至少8位，需含大小写字母和数字'; return;
         }
-        if (password !== confirm) { regError.value = '两次密码不一致'; return; }
-
+        if (password !== regPwd2.value) { regError.value = '两次密码不一致'; return; }
         loading.value = true;
         try {
           const data = await S.register(username, email, password);
@@ -209,16 +195,13 @@
         } finally { loading.value = false; }
       }
 
-      function toggleTheme() { S.toggleTheme(); }
-
       onMounted(() => { S.initTheme(); S.initAuth(); });
 
       return {
-        store, tab, loginVal, loginPwd, loginError, loading, handleLogin,
-        regUsername, regEmail, regPwd, regPwd2, regError, loading,
+        tab, loginVal, loginPwd, loginError, loading, handleLogin,
+        regUsername, regEmail, regPwd, regPwd2, regError,
         usernameHint, emailHint, confirmHint, strength,
         checkUsername, checkEmail, updateStrength, checkConfirm, handleRegister,
-        toggleTheme,
       };
     }
   }).mount('#app');

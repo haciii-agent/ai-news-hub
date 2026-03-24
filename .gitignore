@@ -16,3 +16,8 @@ Thumbs.db
 
 # Go
 vendor/
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+*.log

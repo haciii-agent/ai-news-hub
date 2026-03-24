@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -23,9 +23,6 @@
         <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
         <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
         <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-        <button class="theme-toggle" @click="S.toggleTheme()">
-          {{ S.store.theme === 'dark' ? '☀️' : '🌙' }}
-        </button>
         <div class="nav-user-area" id="navUserArea"></div>
       </div>
     </header>

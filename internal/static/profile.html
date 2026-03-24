@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,117 +24,10 @@
         <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
         <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
         <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-        <button class="theme-toggle" @click="toggleTheme">{{ store.theme === 'dark' ? '☀️' : '🌙' }}</button>
-        <div class="nav-user-area" id="navUserArea"></div>
       </div>
     </header>
 
-    <!-- Page Title Bar -->
-    <div class="page-title-bar">
-      <h1 class="page-title">👤 个人中心</h1>
-    </div>
-
-    <!-- Profile Content -->
-    <main class="main-content profile-content" v-if="!loading">
-      <!-- Basic Info Card -->
-      <div class="profile-card" v-if="profile">
-        <div class="profile-header">
-          <div class="profile-avatar">{{ (profile.username || '?')[0].toUpperCase() }}</div>
-          <div class="profile-info">
-            <div class="profile-username">{{ profile.username || '匿名用户' }}</div>
-            <div class="profile-email">{{ profile.email || '—' }}</div>
-            <div class="profile-role">
-              <span class="role-badge" :class="'role-' + (profile.role || 'anonymous')">
-                {{ roleLabel(profile.role) }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div class="profile-stats">
-          <div class="profile-stat-item">
-            <span class="profile-stat-value">{{ profile.total_bookmarks || 0 }}</span>
-            <span class="profile-stat-label">收藏</span>
-          </div>
-          <div class="profile-stat-item">
-            <span class="profile-stat-value">{{ profile.total_reads || 0 }}</span>
-            <span class="profile-stat-label">阅读</span>
-          </div>
-          <div class="profile-stat-item" v-if="streak">
-            <span class="profile-stat-value">{{ streak.current_streak || 0 }}</span>
-            <span class="profile-stat-label">连续天数</span>
-          </div>
-        </div>
-        <div class="profile-dates">
-          <div class="profile-date-item">
-            <span class="profile-date-label">注册时间</span>
-            <span class="profile-date-value">{{ formatDate(profile.created_at) }}</span>
-          </div>
-          <div class="profile-date-item">
-            <span class="profile-date-label">最后活跃</span>
-            <span class="profile-date-value">{{ formatDate(profile.last_seen_at) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Interests Card -->
-      <div class="profile-card" v-if="profile && profile.profile">
-        <div class="profile-card-title">🏷️ 兴趣标签</div>
-        <div class="profile-tags" v-if="interestTags.length">
-          <span v-for="tag in interestTags" :key="tag.name" class="profile-tag">
-            {{ tag.name }} <span class="tag-weight">{{ (tag.weight * 100).toFixed(0) }}%</span>
-          </span>
-        </div>
-        <div v-else class="profile-empty">暂无兴趣数据</div>
-      </div>
-
-      <!-- Preferred Categories Card -->
-      <div class="profile-card" v-if="profile && profile.profile && profile.profile.preferred_categories && profile.profile.preferred_categories.length">
-        <div class="profile-card-title">📂 偏好分类</div>
-        <div class="profile-tags">
-          <span v-for="cat in profile.profile.preferred_categories" :key="cat" class="profile-tag category-tag">{{ cat }}</span>
-        </div>
-      </div>
-
-      <!-- Reading Streak Card -->
-      <div class="profile-card" v-if="streak">
-        <div class="profile-card-title">🔥 阅读连续打卡</div>
-        <div class="streak-info">
-          <div class="streak-current">
-            <span class="streak-number">{{ streak.current_streak || 0 }}</span>
-            <span class="streak-unit">天</span>
-          </div>
-          <div class="streak-detail">
-            <div>最长连续：<strong>{{ streak.longest_streak || 0 }} 天</strong></div>
-            <div>总阅读天数：<strong>{{ streak.total_days || 0 }} 天</strong></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Change Password Card -->
-      <div class="profile-card">
-        <div class="profile-card-title">🔐 修改密码</div>
-        <form class="password-form" @submit.prevent="handleChangePwd">
-          <div class="form-group">
-            <label>旧密码</label>
-            <input type="password" v-model="oldPwd" required placeholder="输入旧密码" autocomplete="current-password">
-          </div>
-          <div class="form-group">
-            <label>新密码</label>
-            <input type="password" v-model="newPwd" required placeholder="至少8位，含大小写字母和数字" minlength="8" autocomplete="new-password">
-          </div>
-          <div class="form-group">
-            <label>确认新密码</label>
-            <input type="password" v-model="newPwd2" required placeholder="再次输入新密码" autocomplete="new-password">
-          </div>
-          <div v-if="pwdError" class="form-hint error">{{ pwdError }}</div>
-          <div v-if="pwdSuccess" class="form-hint success">{{ pwdSuccess }}</div>
-          <button type="submit" class="btn-primary" :disabled="changingPwd">
-            {{ changingPwd ? '修改中...' : '确认修改' }}
-          </button>
-        </form>
-      </div>
-
-      <!-- Logout -->
+    <!-- Logout -->
       <div class="profile-card">
         <button class="btn-danger" @click="handleLogout">🚪 退出登录</button>
       </div>

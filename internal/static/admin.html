@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,41 +25,17 @@
         <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
         <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
         <div v-html="navUserArea"></div>
-        <button class="theme-toggle" @click="S.toggleTheme()" title="切换主题">{{ themeIcon }}</button>
+        <button class="admin-search-btn admin-search-btn-secondary" @click="clearSearch">清除</button>
       </div>
     </header>
 
-    <!-- Page Title Bar -->
+    <!-- Page Title -->
     <div class="page-title-bar">
       <h1 class="page-title">⚙️ 管理后台</h1>
-      <span class="page-subtitle">用户管理与权限控制</span>
     </div>
 
-    <!-- Main Content -->
-    <main class="main-content" style="max-width: 1100px;">
-
-      <!-- Stats Bar -->
-      <div class="admin-stats">
-        <div class="admin-stat-card">
-          <div class="admin-stat-value">{{ stats.totalUsers }}</div>
-          <div class="admin-stat-label">注册用户总数</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-value">{{ stats.adminCount }}</div>
-          <div class="admin-stat-label">管理员</div>
-        </div>
-        <div class="admin-stat-card">
-          <div class="admin-stat-value">{{ stats.editorCount }}</div>
-          <div class="admin-stat-label">编辑</div>
-        </div>
-      </div>
-
-      <!-- Search Bar -->
-      <div class="admin-search-bar">
-        <input type="text" v-model="searchQuery" @keydown.enter="search" placeholder="搜索用户名或邮箱..." class="admin-search-input">
-        <button class="admin-search-btn" @click="search">搜索</button>
-        <button class="admin-search-btn admin-search-btn-secondary" @click="clearSearch">清除</button>
-      </div>
+    <!-- Main -->
+    <main class="main-content">
 
       <!-- User Table -->
       <div class="admin-table-wrap">

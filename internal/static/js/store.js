@@ -256,9 +256,19 @@
 
   function formatTime(ts) {
     if (!ts) return '';
-    const d = new Date(ts * 1000);
+    // Auto-detect: string = ISO, number > 1e12 = ms, number < 1e12 = seconds
+    let d;
+    if (typeof ts === 'string') {
+      d = new Date(ts);
+    } else if (ts > 1e12) {
+      d = new Date(ts);
+    } else {
+      d = new Date(ts * 1000);
+    }
+    if (isNaN(d.getTime())) return '';
     const now = new Date();
     const diff = (now - d) / 1000;
+    if (diff < 60) return '刚刚';
     if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
     if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
     if (diff < 604800) return Math.floor(diff / 86400) + '天前';
@@ -267,7 +277,12 @@
 
   function formatFullTime(ts) {
     if (!ts) return '';
-    return new Date(ts * 1000).toLocaleString('zh-CN');
+    let d;
+    if (typeof ts === 'string') d = new Date(ts);
+    else if (ts > 1e12) d = new Date(ts);
+    else d = new Date(ts * 1000);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString('zh-CN');
   }
 
   // Record read history

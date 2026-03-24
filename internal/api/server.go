@@ -381,6 +381,13 @@ func (s *Server) articlesHandler(w http.ResponseWriter, r *http.Request) {
 		resp["search"] = searchQuery
 	}
 
+	// Language stats: only for homepage (first page, no filters)
+	if filter.Page == 1 && filter.Category == "" && filter.Language == "" && searchQuery == "" {
+		if langCounts, err := s.Store.GetLanguageCounts(); err == nil {
+			resp["lang_stats"] = langCounts
+		}
+	}
+
 	writeJSON(w, http.StatusOK, resp)
 }
 

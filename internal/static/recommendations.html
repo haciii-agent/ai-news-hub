@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,62 +24,16 @@
         <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
         <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
         <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-        <button class="theme-toggle" @click="S.toggleTheme()">{{ S.store.theme === 'dark' ? '☀️' : '🌙' }}</button>
-        <div class="nav-user-area" id="navUserArea"></div>
       </div>
     </header>
 
     <!-- Page Title -->
     <div class="page-title-bar">
       <h1 class="page-title">🎯 猜你喜欢</h1>
-      <span class="page-subtitle">基于你的阅读兴趣个性化推荐</span>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="loading-spinner" style="text-align:center;padding:60px"><span>加载中...</span></div>
-
-    <!-- Empty: not logged in -->
-    <div v-else-if="!S.isLoggedIn()" class="empty-state" style="padding:60px;text-align:center">
-      <p>登录后可查看个性化推荐</p>
-      <a href="/login.html" class="btn-primary" style="display:inline-block;margin-top:16px">去登录</a>
-    </div>
-
-    <!-- Empty: no data -->
-    <div v-else-if="!loading && !articles.length" class="empty-state" style="padding:60px;text-align:center">
-      <p>暂无推荐内容</p>
-      <p style="font-size:13px;color:var(--text-muted);margin-top:8px">阅读更多文章后，推荐会更精准</p>
-      <a href="/" class="btn-primary" style="display:inline-block;margin-top:16px">去首页看看</a>
-    </div>
-
-    <!-- Articles -->
-    <main v-else class="main-content">
-      <div class="article-list">
-        <article v-for="a in articles" :key="a.id" class="article-card">
-          <div class="article-meta">
-            <span class="article-source">{{ a.source }}</span>
-            <span class="article-sep">·</span>
-            <span class="article-time">{{ formatTime(a.published_at) }}</span>
-            <span v-if="a.language === 'zh'" class="lang-badge">中文</span>
-            <span v-else class="lang-badge lang-en">EN</span>
-          </div>
-          <h2 class="article-title">
-            <a :href="'/article.html?id=' + a.id" target="_blank" @click="recordRead(a)">{{ a.title }}</a>
-          </h2>
-          <p class="article-summary" v-if="a.summary">{{ a.summary }}</p>
-          <div class="article-footer">
-            <div class="article-tags">
-              <span v-for="cat in (a.categories || '').split(',').filter(c=>c)" :key="cat"
-                class="article-tag" :class="getCatClass(cat)">{{ cat }}</span>
-            </div>
-            <div class="article-actions">
-              <button class="action-btn bookmark-btn" :class="{ bookmarked: a.is_bookmarked }"
-                @click="toggleBookmark(a)">{{ a.is_bookmarked ? '📌' : '📍' }}</button>
-            </div>
-          </div>
-        </article>
-      </div>
-
-      <div v-if="hasMore" class="load-more-wrap">
+    <!-- Main -->
+    <main class="main-content">
         <button class="load-more-btn" @click="loadMore" :disabled="loadingMore">
           {{ loadingMore ? '加载中...' : '加载更多' }}
         </button>

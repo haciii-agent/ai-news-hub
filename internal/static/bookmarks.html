@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -24,48 +24,50 @@
         <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
         <a href="/bookmarks.html" class="header-nav-link header-nav-link-active" title="收藏">📌</a>
         <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-        <button class="theme-toggle" @click="S.toggleTheme()">{{ themeIcon }}</button>
-        <div v-html="navUserArea"></div>
       </div>
     </header>
 
-    <!-- Page Title Bar -->
+    <!-- Page Title -->
     <div class="page-title-bar">
       <h1 class="page-title">📌 我的收藏</h1>
-      <span class="page-subtitle" v-if="totalArticles > 0">共 {{ totalArticles }} 篇</span>
     </div>
 
-    <!-- Main Content -->
+    <!-- Main -->
     <main class="main-content">
-      <!-- Loading skeletons -->
-      <div v-if="loading && !articles.length">
-        <div class="skeleton-card" v-for="i in 3" :key="i"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
+      <!-- Not logged in -->
+      <div v-if="!S.isLoggedIn()" class="empty-state" style="padding:60px;text-align:center">
+        <p>登录后可查看收藏内容</p>
+        <a href="/login.html" class="btn-primary" style="display:inline-block;margin-top:16px;text-decoration:none">去登录</a>
       </div>
 
       <!-- Empty state -->
-      <div class="empty-state" v-if="!loading && !articles.length">
-        <div class="empty-icon">📌</div>
-        <p>还没有收藏任何文章</p>
-        <p class="empty-sub">浏览新闻时点击 ❤️ 即可收藏</p>
+      <div v-else-if="!loading && articles.length === 0" class="empty-state" style="padding:60px;text-align:center">
+        <p>暂无收藏内容</p>
+        <a href="/" class="btn-primary" style="display:inline-block;margin-top:16px;text-decoration:none">去首页看看</a>
       </div>
 
-      <!-- Articles -->
-      <div class="article-list">
-        <div class="article-card" v-for="a in articles" :key="a.id" :style="{ transition: 'all 0.3s ease', opacity: removing.has(a.id) ? 0 : 1, transform: removing.has(a.id) ? 'translateX(40px)' : 'none' }">
-          <div class="card-body">
-            <div class="card-title-row">
-              <h3 class="card-title"><a :href="'/article.html?id=' + a.id">{{ S.escapeHtml(a.title) }}</a></h3>
-              <button class="bookmark-btn-small" @click="unbookmark(a)" title="取消收藏">❤️</button>
-              <a class="card-url-link" :href="S.escapeHtml(a.url)" target="_blank" rel="noopener">🔗</a>
+      <!-- Article list -->
+      <div v-else class="article-list">
+        <article v-for="a in articles" :key="a.id" class="article-card">
+          <div class="article-meta">
+            <span class="article-source">{{ a.source }}</span>
+            <span class="article-sep">·</span>
+            <span class="article-time">{{ formatTime(a.published_at || a.collected_at) }}</span>
+          </div>
+          <h2 class="article-title">
+            <a :href="'/article.html?id=' + a.id" target="_blank">{{ a.title }}</a>
+            <a class="card-url-link" :href="S.escapeHtml(a.url)" target="_blank" rel="noopener">🔗</a>
+          </h2>
+          <p class="article-summary" v-if="a.summary">{{ S.escapeHtml(a.summary) }}</p>
+          <div class="article-footer">
+            <div class="article-tags" v-if="a.category">
+              <span class="article-tag" :class="getCatClass(a.category)">{{ a.category }}</span>
             </div>
-            <p class="card-summary" v-if="a.summary">{{ S.escapeHtml(a.summary) }}</p>
-            <div class="card-meta">
-              <span class="card-source">{{ S.escapeHtml(a.source) }}</span>
-              <span class="card-dot">·</span>
-              <span class="card-time">{{ formatTime(a.published_at || a.collected_at) }}</span>
+            <div class="article-actions">
+              <button class="action-btn bookmark-btn bookmarked" @click="unbookmark(a)">📌</button>
             </div>
           </div>
-        </div>
+        </article>
       </div>
 
       <!-- Load more -->
@@ -81,8 +83,13 @@
         共 {{ totalArticles }} 篇 · 第 {{ currentPage }}/{{ totalPages }} 页
       </div>
     </main>
+
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
   </div>
 
+  <div id="toast"></div>
+
+  <script src="js/store.js"></script>
   <script>
   const { createApp, ref, reactive, computed, onMounted } = Vue;
   createApp({
@@ -93,10 +100,8 @@
       const currentPage = ref(1);
       const totalPages = ref(1);
       const totalArticles = ref(0);
-      const loading = ref(false);
+      const loading = ref(true);
       const removing = reactive(new Set());
-      const navUserArea = ref('');
-      const themeIcon = ref('🌙');
 
       const hasMore = computed(() => currentPage.value < totalPages.value);
 
@@ -113,13 +118,15 @@
         } catch(e) { return dateStr; }
       }
 
+      function getCatClass(cat) {
+        const m = S.CATEGORY_COLORS[cat || ''] || 'tag-general';
+        return m.replace('tag-', '');
+      }
+
       async function loadBookmarks(append) {
         if (loading.value) return;
         loading.value = true;
-        if (!append) {
-          articles.value = [];
-          currentPage.value = 1;
-        }
+        if (!append) { articles.value = []; currentPage.value = 1; }
         try {
           const data = await S.apiFetch('/bookmarks?page=' + currentPage.value + '&per_page=' + PER_PAGE);
           if (data.error) { S.showToast(data.message); return; }
@@ -128,11 +135,8 @@
           else articles.value = list;
           totalPages.value = data.total_pages || 1;
           totalArticles.value = data.total || 0;
-        } catch(e) {
-          console.error('Load bookmarks error', e);
-        } finally {
-          loading.value = false;
-        }
+        } catch(e) { console.error(e); }
+        finally { loading.value = false; }
       }
 
       async function unbookmark(article) {
@@ -140,18 +144,11 @@
         removing.add(article.id);
         try {
           await S.api.del('/bookmarks/' + article.id);
-          setTimeout(() => {
-            articles.value = articles.value.filter(a => a.id !== article.id);
-            totalArticles.value--;
-            removing.delete(article.id);
-            if (articles.value.length === 0) {
-              // empty handled by v-if
-            }
-          }, 300);
-        } catch(e) {
-          removing.delete(article.id);
-          S.showToast('操作失败');
-        }
+          articles.value = articles.value.filter(a => a.id !== article.id);
+          totalArticles.value = Math.max(0, totalArticles.value - 1);
+          S.showToast('已取消收藏');
+        } catch(e) { S.showToast('操作失败'); }
+        finally { removing.delete(article.id); }
       }
 
       function loadMore() {
@@ -161,16 +158,13 @@
 
       onMounted(async () => {
         S.initTheme();
-        themeIcon.value = (document.documentElement.getAttribute('data-theme') || 'dark') === 'light' ? '🌙' : '☀️';
-        navUserArea.value = '';
         await S.initAuth();
         await loadBookmarks(false);
       });
 
-      return { S, articles, currentPage, totalPages, totalArticles, loading, removing, navUserArea, themeIcon, hasMore, formatTime, unbookmark, loadMore };
+      return { S, articles, currentPage, totalPages, totalArticles, loading, removing, hasMore, formatTime, getCatClass, unbookmark, loadMore };
     }
   }).mount('#app');
   </script>
-  <script src="js/store.js"></script>
 </body>
 </html>
