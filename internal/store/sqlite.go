@@ -77,6 +77,32 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- 评论表（v1.2.0）
+CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_comments_article ON comments(article_id, created_at DESC);
+
+-- 点赞表（v1.2.0）
+CREATE TABLE IF NOT EXISTS likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    article_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(article_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_likes_article ON likes(article_id);
+
 -- 采集运行记录表（含 errors_count 字段，方便快速判断是否有错）
 CREATE TABLE IF NOT EXISTS collect_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

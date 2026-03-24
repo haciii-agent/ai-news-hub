@@ -66,6 +66,22 @@
           <div class="dash-stat-value" id="statCollectRuns">—</div>
           <div class="dash-stat-label">🔄 采集次数</div>
         </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-value" id="statTotalComments">—</div>
+          <div class="dash-stat-label">💬 总评论</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-value" id="statTodayComments">—</div>
+          <div class="dash-stat-label">📝 今日评论</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-value" id="statTotalLikes">—</div>
+          <div class="dash-stat-label">❤️ 总点赞</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="dash-stat-value" id="statTotalCategories">—</div>
+          <div class="dash-stat-label">🏷️ 总分类</div>
+        </div>
       </div>
 
       <!-- AI Summary Coverage Card -->
@@ -97,6 +113,16 @@
           </div>
         </div>
         <div class="dash-ai-task-status" id="aiTaskStatus" style="display:none;"></div>
+      </div>
+
+      <!-- Top Hot Articles (v1.2.0) -->
+      <div class="dash-section" id="hotArticlesSection">
+        <h2 class="dash-section-title">🔥 最热文章 TOP5</h2>
+        <div class="dash-article-list" id="hotArticlesList"></div>
+        <div class="dash-empty-state" id="hotArticlesEmpty" style="display:none;">
+          <div class="empty-icon">📭</div>
+          <p>暂无互动数据</p>
+        </div>
       </div>
 
       <!-- User Profile Section (v1.0.0) -->
@@ -183,7 +209,7 @@
 
     </div>
 
-    <div class="footer-copyright">AI News Hub v1.0.0 · 用心搭建 ⚡</div>
+    <div class="footer-copyright">AI News Hub v1.2.0 · 用心搭建 ⚡</div>
   </main>
 
   <script src="js/auth.js"></script>
@@ -194,6 +220,15 @@
 
       const API_BASE = '/api/v1/dashboard';
       const AI_API_BASE = '/api/v1/ai';
+
+      function getUserToken() {
+        var token = localStorage.getItem('user_token');
+        if (!token) {
+          token = crypto.randomUUID();
+          localStorage.setItem('user_token', token);
+        }
+        return token;
+      }
 
       // --- Theme ---
       const themeToggle = document.getElementById('themeToggle');
@@ -345,6 +380,10 @@
         document.getElementById('statTodayNew').textContent = fmtNum(stats.today_new);
         document.getElementById('statActiveSources').textContent = (stats.active_sources || 0) + '/' + (stats.total_sources || 0);
         document.getElementById('statCollectRuns').textContent = fmtNum(stats.total_collect_runs);
+        document.getElementById('statTotalComments').textContent = fmtNum(stats.total_comments || 0);
+        document.getElementById('statTodayComments').textContent = fmtNum(stats.today_comments || 0);
+        document.getElementById('statTotalLikes').textContent = fmtNum(stats.total_likes || 0);
+        document.getElementById('statTotalCategories').textContent = fmtNum(stats.total_categories || 0);
 
         if (stats.last_collect_time) {
           const summary = document.getElementById('collectSummary');
@@ -358,6 +397,35 @@
             (lc.duration_seconds ? ' · 耗时 ' + lc.duration_seconds + 's' : '');
           summary.style.display = 'block';
         }
+
+        // Hot articles
+        renderHotArticles(stats.top_hot_articles || []);
+      }
+
+      function renderHotArticles(articles) {
+        const listEl = document.getElementById('hotArticlesList');
+        const emptyEl = document.getElementById('hotArticlesEmpty');
+
+        if (!articles || articles.length === 0) {
+          listEl.style.display = 'none';
+          emptyEl.style.display = 'block';
+          return;
+        }
+
+        listEl.style.display = 'block';
+        emptyEl.style.display = 'none';
+
+        let html = '';
+        articles.forEach(function(a, i) {
+          const color = categoryColor(a.category);
+          html += '<a href="/article.html?id=' + a.id + '" class="dash-article-item">' +
+            '<span class="dash-article-dot" style="background:' + color + ';"></span>' +
+            '<span class="dash-article-title">🔥' + (i+1) + ' ' + escHTML(a.title) + '</span>' +
+            '<span class="dash-article-meta">❤️' + a.likes_count + ' 💬' + a.comments_count + '</span>' +
+            '</a>';
+        });
+
+        listEl.innerHTML = html;
       }
 
       // --- AI Summary Functions ---

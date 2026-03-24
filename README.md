@@ -4,7 +4,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-FTS5-003B57?logo=sqlite)](https://www.sqlite.org/fts5.html)
-[![Version](https://img.shields.io/badge/Version-1.1.0-blue)](https://github.com/haciii-agent/ai-news-hub/releases)
+[![Version](https://img.shields.io/badge/Version-1.2.0-blue)](https://github.com/haciii-agent/ai-news-hub/releases)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ## ✨ 功能特性
@@ -25,6 +25,9 @@
 | 📈 **热点趋势** | 话题排行榜 + 趋势时间线 + 选题推荐 + 关联话题发现 |
 | 🖼️ **图片提取** | 自动抓取 og:image / media:content / enclosure 封面图 |
 | 🌓 **主题切换** | 深色/浅色模式，localStorage 持久化 |
+| 💬 **评论系统** | 文章评论 + 匿名发表 + 删除自己的评论 |
+| ❤️ **点赞互动** | 文章点赞/取消 + 卡片快捷点赞 |
+| 📤 **分享功能** | 复制链接 + Twitter + 微博分享 |
 | 🔄 **定时采集** | 内置调度器 + 手动触发 + 状态监控 |
 | 📦 **REST API** | 完整 JSON API，支持分页、分类、语言过滤、推荐、搜索 |
 | 🐳 **单二进制** | 前端嵌入 `embed.FS`，一个文件搞定部署 |
@@ -100,6 +103,18 @@ GET    /api/v1/bookmarks                                 # 收藏列表
 GET    /api/v1/bookmarks/status?ids=1,2,3                # 批量收藏状态
 POST   /api/v1/history                                   # 记录阅读
 GET    /api/v1/history                                   # 阅读历史
+```
+
+### 评论 & 点赞
+
+```
+POST   /api/v1/articles/{id}/comments                     # 发表评论
+GET    /api/v1/articles/{id}/comments?page=1&per_page=20   # 评论列表
+DELETE /api/v1/articles/{id}/comments/{comment_id}         # 删除评论
+POST   /api/v1/articles/{id}/like                         # 点赞
+DELETE /api/v1/articles/{id}/like                         # 取消点赞
+GET    /api/v1/articles/{id}/interactions                 # 文章互动状态
+GET    /api/v1/articles/interactions?ids=1,2,3            # 批量互动状态
 ```
 
 ### AI 功能
@@ -233,6 +248,17 @@ ai-news-hub/
 ```
 
 ## 📝 版本历史
+
+### v1.2.0 — 评论点赞 + 社交互动
+- 评论系统（发表/列表/删除，1-500 字符限制，匿名用户）
+- 点赞系统（点赞/取消，卡面快捷点赞，已点赞变红）
+- 批量互动状态查询（卡片显示 ❤️15 · 💬8）
+- 文章详情页互动栏（点赞数 + 评论数 + 点赞按钮）
+- 分享功能（复制链接 + Twitter + 微博，纯前端实现）
+- 评论/点赞触发用户画像更新（标签权重 +0.15/+0.10）
+- 看板新增互动统计（总评论/今日评论/总点赞/最热文章 TOP5）
+- 评论需要 X-User-Token，无 Token 只可查看
+- 7 个新 API 接口
 
 ### v1.1.0 — AI 热点趋势分析
 - 热点话题排行榜（综合热度评分：频率40% + 增速25% + 来源多样性15% + 用户互动20%）

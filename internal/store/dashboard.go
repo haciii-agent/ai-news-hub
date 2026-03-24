@@ -9,16 +9,31 @@ import (
 
 // DashboardStats holds core system statistics for the dashboard.
 type DashboardStats struct {
-	TotalArticles   int             `json:"total_articles"`
-	TodayNew        int             `json:"today_new"`
-	TotalSources    int             `json:"total_sources"`
-	ActiveSources   int             `json:"active_sources"`
-	FailedSources   int             `json:"failed_sources"`
-	TotalCategories int             `json:"total_categories"`
-	TotalCollectRuns int            `json:"total_collect_runs"`
-	LastCollectTime string          `json:"last_collect_time,omitempty"`
-	LastCollectStatus string        `json:"last_collect_status,omitempty"`
-	LatestCollect   *CollectRunSummary `json:"latest_collect,omitempty"`
+	TotalArticles    int               `json:"total_articles"`
+	TodayNew         int               `json:"today_new"`
+	TotalSources     int               `json:"total_sources"`
+	ActiveSources    int               `json:"active_sources"`
+	FailedSources    int               `json:"failed_sources"`
+	TotalCategories  int               `json:"total_categories"`
+	TotalCollectRuns int               `json:"total_collect_runs"`
+	LastCollectTime  string            `json:"last_collect_time,omitempty"`
+	LastCollectStatus string           `json:"last_collect_status,omitempty"`
+	LatestCollect    *CollectRunSummary `json:"latest_collect,omitempty"`
+	TotalComments    int               `json:"total_comments"`
+	TodayComments    int               `json:"today_comments"`
+	TotalLikes       int               `json:"total_likes"`
+	TopHotArticles   []HotArticle      `json:"top_hot_articles,omitempty"`
+}
+
+// HotArticle represents a hot article by interaction count.
+type HotArticle struct {
+	ID             int64  `json:"id"`
+	Title          string `json:"title"`
+	Source         string `json:"source"`
+	Category       string `json:"category"`
+	LikesCount     int64  `json:"likes_count"`
+	CommentsCount  int64  `json:"comments_count"`
+	InteractionSum int64  `json:"interaction_sum"`
 }
 
 // CollectRunSummary is a simplified collect run for dashboard display.
@@ -177,6 +192,25 @@ func (ds *DashboardStore) GetStats() (*DashboardStats, error) {
 	} else if stats.TotalSources > 0 {
 		// No collect runs yet, but we have sources in articles — assume all active
 		stats.ActiveSources = stats.TotalSources
+	}
+
+	// Interaction stats (v1.2.0)
+	if err := ds.db.QueryRow("SELECT COUNT(*) FROM comments").Scan(&stats.TotalComments); err != nil {
+		return nil, fmt.Errorf("count total comments: %w", err)
+	}
+	if err := ds.db.QueryRow(
+		"SELECT COUNT(*) FROM comments WHERE date(created_at) = date('now', 'localtime')",
+	).Scan(&stats.TodayComments); err != nil {
+		return nil, fmt.Errorf("count today comments: %w", err)
+	}
+	if err := ds.db.QueryRow("SELECT COUNT(*) FROM likes").Scan(&stats.TotalLikes); err != nil {
+		return nil, fmt.Errorf("count total likes: %w", err)
+	}
+
+	// Top 5 hot articles by interaction count
+	topArticles, err := ds.GetTopHotArticles(5)
+	if err == nil {
+		stats.TopHotArticles = topArticles
 	}
 
 	return stats, nil
@@ -508,4 +542,49 @@ func (ds *DashboardStore) GetCollectHistory(limit int) (*CollectHistoryResponse,
 	}
 
 	return &CollectHistoryResponse{Runs: runs}, nil
+}
+
+// GetTopHotArticles returns the top N articles by total interaction count (likes + comments).
+func (ds *DashboardStore) GetTopHotArticles(limit int) ([]HotArticle, error) {
+	if limit < 1 {
+		limit = 5
+	}
+	if limit > 20 {
+		limit = 20
+	}
+
+	rows, err := ds.db.Query(`
+		SELECT a.id, a.title, a.source, a.category,
+			COALESCE(lc.likes_count, 0) as likes_count,
+			COALESCE(cc.comments_count, 0) as comments_count,
+			COALESCE(lc.likes_count, 0) + COALESCE(cc.comments_count, 0) as interaction_sum
+		FROM articles a
+		LEFT JOIN (SELECT article_id, COUNT(*) as likes_count FROM likes GROUP BY article_id) lc ON lc.article_id = a.id
+		LEFT JOIN (SELECT article_id, COUNT(*) as comments_count FROM comments GROUP BY article_id) cc ON cc.article_id = a.id
+		WHERE COALESCE(lc.likes_count, 0) + COALESCE(cc.comments_count, 0) > 0
+		ORDER BY interaction_sum DESC
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("top hot articles: %w", err)
+	}
+	defer rows.Close()
+
+	var articles []HotArticle
+	for rows.Next() {
+		var a HotArticle
+		if err := rows.Scan(&a.ID, &a.Title, &a.Source, &a.Category, &a.LikesCount, &a.CommentsCount, &a.InteractionSum); err != nil {
+			return nil, fmt.Errorf("scan hot article: %w", err)
+		}
+		articles = append(articles, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate hot articles: %w", err)
+	}
+
+	if articles == nil {
+		articles = []HotArticle{}
+	}
+
+	return articles, nil
 }

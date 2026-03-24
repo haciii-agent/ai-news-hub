@@ -24,10 +24,11 @@ type Server struct {
 	Store           store.ArticleStore
 	UserStore       store.UserStore
 	ProfileStore    store.ProfileStore
+	CommentStore    store.CommentStore
 	AuthMgr         *auth.AuthManager
 	AuthStore       store.AuthStore
 	LoginLogStore   store.LoginLogStore
-	AdminMgr        store.AdminStore // Worker-B will populate this
+	AdminMgr        store.AdminStore
 	CollectSvc      *CollectService
 	Classifier      *classifier.Manager
 	Summarizer      *ai.Summarizer
@@ -74,6 +75,9 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 
 	// Initialize profile store (v1.0.0)
 	srv.initProfileStore(db)
+
+	// Initialize comment store (v1.2.0)
+	srv.CommentStore = store.NewCommentStore(db)
 
 	// Initialize auth system (v1.2.0)
 	authStore := store.NewAuthStore(db)
@@ -151,6 +155,9 @@ func (s *Server) Handler() http.Handler {
 	// Admin routes (v1.2.0) — handlers implemented by Worker-B
 	mux.HandleFunc("/api/v1/admin/users", s.HandleAdminListUsers)
 	mux.HandleFunc("/api/v1/admin/users/", s.adminRouter)
+
+	// Comment & Like features (v1.2.0) — handled by articlesPathRouter
+	// (no separate registration needed, articlesPathRouter handles all /api/v1/articles/* paths)
 
 	// Static files (embed.FS) — serve at root, API takes precedence
 	staticFS := http.FileServer(http.FS(static.FS()))
@@ -232,15 +239,41 @@ func (s *Server) methodRouter(listHandler, detailHandler http.HandlerFunc) http.
 }
 
 // articlesPathRouter routes /api/v1/articles/... requests to the correct handler.
-// /api/v1/articles/{id} → articleDetailHandler
-// /api/v1/articles/{id}/content → HandleArticleContent
 func (s *Server) articlesPathRouter(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/articles/")
 	path = strings.TrimSuffix(path, "/")
 
+	// /api/v1/articles/interactions — batch interactions (v1.2.0)
+	if path == "interactions" {
+		s.HandleBatchInteractions(w, r)
+		return
+	}
+
 	// /api/v1/articles/{id}/content
 	if strings.HasSuffix(path, "/content") {
 		s.HandleArticleContent(w, r)
+		return
+	}
+
+	// Check for /comments sub-path
+	if idx := strings.Index(path, "/comments"); idx > 0 {
+		articleIDStr := path[:idx]
+		commentPath := path[idx+len("/comments"):]
+		s.commentRouter(w, r, articleIDStr, commentPath)
+		return
+	}
+
+	// Check for /like sub-path
+	if idx := strings.Index(path, "/like"); idx > 0 {
+		articleIDStr := path[:idx]
+		s.likeRouter(w, r, articleIDStr)
+		return
+	}
+
+	// Check for /interactions sub-path (single article)
+	if idx := strings.Index(path, "/interactions"); idx > 0 {
+		articleIDStr := path[:idx]
+		s.HandleArticleInteractions(w, r, articleIDStr)
 		return
 	}
 

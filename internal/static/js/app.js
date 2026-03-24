@@ -26,6 +26,8 @@
 
   // Bookmark state cache
   let bookmarkState = {}; // { articleId: bool }
+  // Interaction state cache (v1.2.0)
+  let interactionState = {}; // { articleId: { likes_count, comments_count, is_liked } }
 
   // --- State ---
   let currentLang = 'all';
@@ -352,6 +354,7 @@
       // Fetch bookmark status for search results
       if (articles.length > 0) {
         fetchBookmarkStatus(articles);
+        fetchInteractionStatus(articles);
       }
 
       // Load more button
@@ -611,6 +614,7 @@
       // Fetch bookmark status for current page articles
       if (articles.length > 0) {
         fetchBookmarkStatus(articles);
+        fetchInteractionStatus(articles);
       }
 
       // Load more button
@@ -657,6 +661,14 @@
       var bookmarkIcon = isBookmarked ? '❤️' : '🤍';
       var bookmarkClass = isBookmarked ? 'bookmark-btn bookmarked' : 'bookmark-btn';
 
+      // Interaction data (v1.2.0)
+      var inter = interactionState[a.id] || {};
+      var likesCount = inter.likes_count || 0;
+      var commentsCount = inter.comments_count || 0;
+      var isLiked = !!inter.is_liked;
+      var likeIcon = isLiked ? '❤️' : '🤍';
+      var likeBtnClass = isLiked ? 'card-like-btn liked' : 'card-like-btn';
+
       // Importance score badge
       var scoreBadge = '';
       if (a.importance_score > 0) {
@@ -678,13 +690,23 @@
         thumbnailHtml = '<div class="card-thumbnail"><img src="' + escapeAttr(a.image_url) + '" alt="" loading="lazy" onerror="this.parentElement.style.display=\'none\'"></div>';
       }
 
-      return '<div class="article-card ' + highlightClass + '" data-category="' + escapeAttr(category) + '">'
+      // Interaction info line
+      var interactionHtml = '';
+      if (likesCount > 0 || commentsCount > 0) {
+        interactionHtml = '<div class="card-interactions">'
+          + '<a class="card-interaction-stat" href="' + detailHref + '"><span class="interact-num">❤️' + likesCount + '</span></a>'
+          + '<a class="card-interaction-stat" href="' + detailHref + '"><span class="interact-num">💬' + commentsCount + '</span></a>'
+          + '</div>';
+      }
+
+      return '<div class="article-card ' + highlightClass + '" data-category="' + escapeAttr(category) + '" data-article-id="' + a.id + '">'
         + '<div class="card-rank">' + rank + '</div>'
         + thumbnailHtml
         + '<div class="card-body">'
         + '<div class="card-title-row">'
         + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
         + scoreBadge + aiIndicator
+        + '<button class="' + likeBtnClass + '" data-article-id="' + a.id + '" onclick="toggleCardLike(this)" title="点赞">' + likeIcon + '</button>'
         + '<button class="' + bookmarkClass + '" data-article-id="' + a.id + '" onclick="toggleCardBookmark(this)" title="收藏">💡</button>'
         + '<a class="card-url-link" href="' + escapeAttr(a.url) + '" target="_blank" rel="noopener" title="原文链接">🔗</a>'
         + '</div>'
@@ -696,6 +718,7 @@
         + '<span class="card-lang ' + langClass + '">' + langLabel + '</span>'
         + '<span class="tag ' + catClass + '">' + escapeHtml(category) + '</span>'
         + '</div>'
+        + interactionHtml
         + '</div>'
         + '</div>';
     }).join('');
@@ -822,6 +845,109 @@
           btn.textContent = '❤️';
           btn.classList.add('bookmarked', 'bookmark-pop');
           setTimeout(function() { btn.classList.remove('bookmark-pop'); }, 500);
+        }
+      }).catch(function() {});
+    }
+  };
+
+  // --- Interaction status (v1.2.0) ---
+
+  async function fetchInteractionStatus(articles) {
+    if (!articles || articles.length === 0) return;
+    var ids = articles.map(function(a) { return a.id; }).join(',');
+    try {
+      var res = await fetch(API_BASE + '/articles/interactions?ids=' + ids, {
+        headers: { 'X-User-Token': getUserToken() },
+      });
+      var data = await res.json();
+      if (data.interactions) {
+        for (var key in data.interactions) {
+          interactionState[key] = data.interactions[key];
+        }
+        updateInteractionDisplay();
+      }
+    } catch (err) {
+      // Silent fail
+    }
+  }
+
+  function updateInteractionDisplay() {
+    document.querySelectorAll('.article-card[data-article-id]').forEach(function(card) {
+      var id = card.dataset.articleId;
+      var inter = interactionState[id];
+      if (!inter) return;
+
+      // Update like button
+      var likeBtn = card.querySelector('.card-like-btn');
+      if (likeBtn) {
+        if (inter.is_liked) {
+          likeBtn.textContent = '❤️';
+          likeBtn.classList.add('liked');
+        } else {
+          likeBtn.textContent = '🤍';
+          likeBtn.classList.remove('liked');
+        }
+      }
+
+      // Update interaction stats display
+      var interDiv = card.querySelector('.card-interactions');
+      if (interDiv) {
+        var detailHref = '/article.html?id=' + id;
+        interDiv.innerHTML = '<a class="card-interaction-stat" href="' + detailHref + '"><span class="interact-num">❤️' + (inter.likes_count || 0) + '</span></a>'
+          + '<a class="card-interaction-stat" href="' + detailHref + '"><span class="interact-num">💬' + (inter.comments_count || 0) + '</span></a>';
+      } else if ((inter.likes_count || 0) > 0 || (inter.comments_count || 0) > 0) {
+        // Add interaction div if not present
+        var body = card.querySelector('.card-body');
+        if (body) {
+          var detailHref = '/article.html?id=' + id;
+          var newInterDiv = document.createElement('div');
+          newInterDiv.className = 'card-interactions';
+          newInterDiv.innerHTML = '<a class="card-interaction-stat" href="' + detailHref + '"><span class="interact-num">❤️' + (inter.likes_count || 0) + '</span></a>'
+            + '<a class="card-interaction-stat" href="' + detailHref + '"><span class="interact-num">💬' + (inter.comments_count || 0) + '</span></a>';
+          body.appendChild(newInterDiv);
+        }
+      }
+    });
+  }
+
+  // Global toggle function for card like buttons (v1.2.0)
+  window.toggleCardLike = function(btn) {
+    var articleId = btn.dataset.articleId;
+    var isLiked = btn.classList.contains('liked');
+
+    if (isLiked) {
+      // Unlike
+      fetch(API_BASE + '/articles/' + articleId + '/like', {
+        method: 'DELETE',
+        headers: authHeaders(),
+      }).then(function(res) { return res.json(); }).then(function(data) {
+        if (!data.error) {
+          btn.textContent = '🤍';
+          btn.classList.remove('liked');
+          if (interactionState[articleId]) {
+            interactionState[articleId].is_liked = false;
+            interactionState[articleId].likes_count = Math.max(0, (interactionState[articleId].likes_count || 0) - 1);
+          }
+          updateInteractionDisplay();
+        }
+      }).catch(function() {});
+    } else {
+      // Like
+      fetch(API_BASE + '/articles/' + articleId + '/like', {
+        method: 'POST',
+        headers: authHeaders(),
+      }).then(function(res) { return res.json(); }).then(function(data) {
+        if (!data.error) {
+          btn.textContent = '❤️';
+          btn.classList.add('liked', 'like-pop');
+          setTimeout(function() { btn.classList.remove('like-pop'); }, 400);
+          if (interactionState[articleId]) {
+            interactionState[articleId].is_liked = true;
+            interactionState[articleId].likes_count = (interactionState[articleId].likes_count || 0) + 1;
+          } else {
+            interactionState[articleId] = { likes_count: 1, comments_count: 0, is_liked: true };
+          }
+          updateInteractionDisplay();
         }
       }).catch(function() {});
     }

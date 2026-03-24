@@ -272,6 +272,43 @@ func (s *userStore) BookmarkArticleWithProfileUpdate(userID, articleID int64) er
 	return nil
 }
 
+// CommentArticleWithProfileUpdate comments on an article and triggers profile update.
+func (s *userStore) CommentArticleWithProfileUpdate(userID, articleID int64) {
+	go s.triggerProfileUpdateWithWeight(userID, articleID, 0.15)
+}
+
+// LikeArticleWithProfileUpdate likes an article and triggers profile update.
+func (s *userStore) LikeArticleWithProfileUpdate(userID, articleID int64) {
+	go s.triggerProfileUpdateWithWeight(userID, articleID, 0.10)
+}
+
+// triggerProfileUpdateWithWeight updates user profile based on article content with a custom weight multiplier.
+func (s *userStore) triggerProfileUpdateWithWeight(userID, articleID int64, weightMultiplier float64) {
+	// Fetch article to get category and title
+	var category, title string
+	err := s.db.QueryRow(
+		`SELECT COALESCE(category, ''), COALESCE(title, '') FROM articles WHERE id = ?`,
+		articleID,
+	).Scan(&category, &title)
+	if err != nil {
+		return
+	}
+
+	tags := ExtractTagsFromArticle(category, title)
+	if len(tags) == 0 {
+		return
+	}
+
+	// Apply custom weight multiplier
+	for tag := range tags {
+		tags[tag] *= weightMultiplier
+	}
+
+	if err := s.pStore.UpdateProfileInterests(userID, tags); err != nil {
+		fmt.Printf("[profile] async update failed for user %d: %v\n", userID, err)
+	}
+}
+
 // triggerProfileUpdate updates user profile based on article content.
 func (s *userStore) triggerProfileUpdate(userID, articleID int64, isBookmark bool) {
 	// Fetch article to get category and title
