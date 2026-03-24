@@ -143,7 +143,6 @@ func (s *Summarizer) GenerateSummary(article store.Article) (string, error) {
 	}
 
 	url := s.apiBase + "/chat/completions"
-	log.Printf("[ai-debug] URL=%s key_prefix=%s", url, s.apiKey[:min(10, len(s.apiKey))])
 	req, err := http.NewRequest("POST", url, bytes.NewReader(jsonBytes))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
