@@ -24,3 +24,4 @@ frontend/dist/
 
 # Local config overrides (contains secrets)
 config.yaml
+ai-news-hub-new
