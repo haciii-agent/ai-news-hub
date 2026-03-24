@@ -59,8 +59,14 @@ func main() {
 	}
 	defer db.Close()
 
+	// Create article store first (needed by both API server and scheduler).
+	articleStore := store.NewArticleStore(db)
+
+	// Initialize collect scheduler first (needs articleStore).
+	collectScheduler := collector.NewCollectScheduler(&cfg.Collector, articleStore)
+
 	// Initialize API server (wires collector, classifier, store).
-	srv, err := api.NewServer(db, cfg, version)
+	srv, err := api.NewServer(db, cfg, version, articleStore, collectScheduler)
 	if err != nil {
 		log.Fatalf("[main] failed to init server: %v", err)
 	}
@@ -85,7 +91,6 @@ func main() {
 	}()
 
 	// 定时采集调度器：启动后立即执行一次，之后每4小时执行一次。
-	collectScheduler := collector.NewCollectScheduler(&cfg.Collector)
 	go func() {
 		log.Println("[scheduler] 启动定时采集调度器，周期：4小时")
 		// 启动后立即执行一次

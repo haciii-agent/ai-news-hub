@@ -36,9 +36,7 @@ type Server struct {
 }
 
 // NewServer creates a fully-wired HTTP server with all routes registered.
-func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) {
-	// Initialize store
-	articleStore := store.NewArticleStore(db)
+func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore store.ArticleStore, collectScheduler *collector.CollectScheduler) (*Server, error) {
 	userStore := store.NewUserStore(db)
 
 	// Initialize classifier
@@ -55,9 +53,6 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 		log.Println("[api] AI summarizer disabled (no API key configured)")
 	}
 
-	// Initialize collect scheduler
-	sched := collector.NewCollectScheduler(&cfg.Collector)
-
 	srv := &Server{
 		DB:         db,
 		Cfg:        cfg,
@@ -67,7 +62,7 @@ func NewServer(db *sql.DB, cfg *config.Config, version string) (*Server, error) 
 		Summarizer: summarizer,
 		Version:    version,
 		CollectSvc: &CollectService{
-			Scheduler:  sched,
+			Scheduler:  collectScheduler,
 			Classifier: clr,
 			Store:      articleStore,
 		},
