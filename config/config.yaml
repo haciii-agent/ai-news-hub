@@ -2,7 +2,7 @@
 
 server:
   host: "0.0.0.0"
-  port: 8080
+  port: 8089
 
 database:
   path: "./data/news.db"
@@ -12,7 +12,7 @@ collector:
   timeout: 30s
   max_concurrent: 5
   request_interval: "2-5s"
-  rss_max_items: 30
+  rss_max_items: 50
 
 classifier:
   rules_path: "./config/rules.yaml"

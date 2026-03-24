@@ -17,7 +17,8 @@ type Source struct {
 // RSS 数据源注册表
 // ---------------------------------------------------------------------------
 
-// DefaultRSSSources 12 个 RSS/Atom 数据源注册表。
+// DefaultRSSSources RSS/Atom 数据源注册表。
+// 英文源仅保留 HackerNews、The Verge AI、HuggingFace Blog。
 var DefaultRSSSources = []Source{
 	{
 		Name:       "Hacker News",
@@ -27,45 +28,10 @@ var DefaultRSSSources = []Source{
 		Language:   "en",
 	},
 	{
-		Name:       "TechCrunch AI",
-		URL:        "https://techcrunch.com/category/artificial-intelligence/feed/",
-		Type:       "rss",
-		Categories: []string{"AI/ML", "商业动态"},
-		Language:   "en",
-	},
-	{
 		Name:       "The Verge AI",
 		URL:        "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
 		Type:       "rss",
 		Categories: []string{"AI/ML", "科技前沿", "产品发布"},
-		Language:   "en",
-	},
-	{
-		Name:       "OpenAI Blog",
-		URL:        "https://openai.com/blog/rss/",
-		Type:       "rss",
-		Categories: []string{"AI/ML", "产品发布"},
-		Language:   "en",
-	},
-	{
-		Name:       "Google AI Blog",
-		URL:        "https://blog.google/technology/ai/rss/",
-		Type:       "rss",
-		Categories: []string{"AI/ML", "学术研究"},
-		Language:   "en",
-	},
-	{
-		Name:       "MIT Tech Review",
-		URL:        "https://www.technologyreview.com/feed/",
-		Type:       "rss",
-		Categories: []string{"AI/ML", "科技前沿", "学术研究"},
-		Language:   "en",
-	},
-	{
-		Name:       "Ars Technica",
-		URL:        "https://feeds.arstechnica.com/arstechnica/index",
-		Type:       "rss",
-		Categories: []string{"AI/ML", "科技前沿", "政策监管"},
 		Language:   "en",
 	},
 	{
@@ -101,6 +67,20 @@ var DefaultRSSSources = []Source{
 		URL:        "https://geekpark.net/rss",
 		Type:       "rss",
 		Categories: []string{"商业动态", "AI/ML", "科技前沿"},
+		Language:   "zh",
+	},
+	{
+		Name:       "雷锋网",
+		URL:        "https://www.leiphone.com/feed",
+		Type:       "rss",
+		Categories: []string{"AI/ML", "科技前沿", "商业动态"},
+		Language:   "zh",
+	},
+	{
+		Name:       "CSDN AI",
+		URL:        "https://blog.csdn.net/nav/ai",
+		Type:       "rss",
+		Categories: []string{"AI/ML", "科技前沿"},
 		Language:   "zh",
 	},
 }

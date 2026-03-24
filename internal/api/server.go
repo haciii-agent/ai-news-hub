@@ -99,7 +99,6 @@ func (s *Server) Handler() http.Handler {
 	// API v1 routes
 	mux.HandleFunc("/api/v1/articles", s.methodRouter(s.articlesHandler, s.articleDetailHandler))
 	mux.HandleFunc("/api/v1/articles/", s.articlesPathRouter)
-	mux.HandleFunc("/api/v1/articles/", s.methodRouter(nil, s.HandleArticleContent))
 	mux.HandleFunc("/api/v1/categories", s.categoriesHandler)
 	mux.HandleFunc("/api/v1/collect", s.CollectSvc.HandleCollect)
 	mux.HandleFunc("/api/v1/collect/status", s.CollectSvc.HandleCollectStatus)
