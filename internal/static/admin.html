@@ -4,382 +4,216 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>管理后台 — AI News Hub</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 <body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="header-logo">
+          <span class="logo-icon">📰</span>
+          <span>AI News <span class="logo-text-accent">Hub</span></span>
+        </a>
+        <span class="header-clock">{{ clock }}</span>
+      </div>
+      <div class="header-right">
+        <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+        <a href="/admin.html" class="header-nav-link header-nav-link-active" title="管理后台">⚙️</a>
+        <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+        <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+        <div v-html="navUserArea"></div>
+        <button class="theme-toggle" @click="S.toggleTheme()" title="切换主题">{{ themeIcon }}</button>
+      </div>
+    </header>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="/" class="header-logo">
-        <span class="logo-icon">📰</span>
-        <span>AI News <span class="logo-text-accent">Hub</span></span>
-      </a>
-      <span class="header-clock" id="headerClock"></span>
+    <!-- Page Title Bar -->
+    <div class="page-title-bar">
+      <h1 class="page-title">⚙️ 管理后台</h1>
+      <span class="page-subtitle">用户管理与权限控制</span>
     </div>
-    <div class="header-right">
-      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
-      <a href="/admin.html" class="header-nav-link header-nav-link-active" title="管理后台">⚙️</a>
-      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-      <div id="navUserArea"></div>
-      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
-    </div>
-  </header>
 
-  <!-- Page Title Bar -->
-  <div class="page-title-bar">
-    <h1 class="page-title">⚙️ 管理后台</h1>
-    <span class="page-subtitle" id="adminSubtitle">用户管理与权限控制</span>
+    <!-- Main Content -->
+    <main class="main-content" style="max-width: 1100px;">
+
+      <!-- Stats Bar -->
+      <div class="admin-stats">
+        <div class="admin-stat-card">
+          <div class="admin-stat-value">{{ stats.totalUsers }}</div>
+          <div class="admin-stat-label">注册用户总数</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-value">{{ stats.adminCount }}</div>
+          <div class="admin-stat-label">管理员</div>
+        </div>
+        <div class="admin-stat-card">
+          <div class="admin-stat-value">{{ stats.editorCount }}</div>
+          <div class="admin-stat-label">编辑</div>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="admin-search-bar">
+        <input type="text" v-model="searchQuery" @keydown.enter="search" placeholder="搜索用户名或邮箱..." class="admin-search-input">
+        <button class="admin-search-btn" @click="search">搜索</button>
+        <button class="admin-search-btn admin-search-btn-secondary" @click="clearSearch">清除</button>
+      </div>
+
+      <!-- User Table -->
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户名</th>
+              <th>邮箱</th>
+              <th>角色</th>
+              <th>状态</th>
+              <th>注册时间</th>
+              <th>最后活跃</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading"><td colspan="8" class="admin-table-empty">加载中...</td></tr>
+            <tr v-else-if="!users.length"><td colspan="8" class="admin-table-empty">没有找到用户</td></tr>
+            <tr v-for="u in users" :key="u.id">
+              <td>{{ u.id }}</td>
+              <td>{{ S.escapeHtml(u.username || '(匿名)') }}</td>
+              <td>{{ S.escapeHtml(u.email || '-') }}</td>
+              <td>
+                <select class="admin-role-select" :data-id="u.id" :data-current="u.role" @change="changeRole($event, u)">
+                  <option value="viewer" :selected="u.role === 'viewer'">viewer</option>
+                  <option value="editor" :selected="u.role === 'editor'">editor</option>
+                  <option value="admin" :selected="u.role === 'admin'">admin</option>
+                  <option value="anonymous" :selected="u.role === 'anonymous'">anonymous</option>
+                </select>
+              </td>
+              <td>
+                <button class="admin-status-toggle" :class="u.disabled ? 'disabled' : 'enabled'" @click="toggleStatus(u)">
+                  {{ u.disabled ? '已禁用' : '正常' }}
+                </button>
+              </td>
+              <td>{{ formatDate(u.created_at) }}</td>
+              <td>{{ formatDate(u.last_seen_at) }}</td>
+              <td><button class="admin-action-btn" @click="showDetail(u.id)">详情</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="admin-pagination" v-if="totalPages > 1">
+        <button class="admin-page-btn" :disabled="currentPage <= 1" @click="goPage(currentPage - 1)">上一页</button>
+        <button v-for="p in pageRange" :key="p" class="admin-page-btn" :class="{ active: p === currentPage }" @click="goPage(p)">{{ p }}</button>
+        <button class="admin-page-btn" :disabled="currentPage >= totalPages" @click="goPage(currentPage + 1)">下一页</button>
+      </div>
+
+    </main>
+
+    <!-- User Detail Modal -->
+    <div class="admin-modal-overlay" v-if="showModal" @click.self="closeModal">
+      <div class="admin-modal">
+        <div class="admin-modal-header">
+          <h2>用户详情</h2>
+          <button class="admin-modal-close" @click="closeModal">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <template v-if="detailLoading">
+            <p style="color:var(--text-muted);">加载中...</p>
+          </template>
+          <template v-else-if="detailUser">
+            <div class="admin-detail-row"><span class="admin-detail-label">ID</span><span class="admin-detail-value">{{ detailUser.id }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">用户名</span><span class="admin-detail-value">{{ S.escapeHtml(detailUser.username || '(匿名)') }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">邮箱</span><span class="admin-detail-value">{{ S.escapeHtml(detailUser.email || '-') }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">角色</span><span class="admin-detail-value">{{ S.escapeHtml(detailUser.role) }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">状态</span><span class="admin-detail-value">{{ detailUser.disabled ? '已禁用' : '正常' }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">注册时间</span><span class="admin-detail-value">{{ formatDate(detailUser.created_at) }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">最后活跃</span><span class="admin-detail-value">{{ formatDate(detailUser.last_seen_at) }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">收藏数</span><span class="admin-detail-value">{{ detailUser.total_bookmarks || 0 }}</span></div>
+            <div class="admin-detail-row"><span class="admin-detail-label">阅读数</span><span class="admin-detail-value">{{ detailUser.total_reads || 0 }}</span></div>
+            <div class="admin-detail-section" v-if="detailUser.profile">
+              <h3>兴趣标签</h3>
+              <template v-if="interestTags.length">
+                <span class="admin-tag" v-for="(weight, tag) in interestTags" :key="tag">{{ S.escapeHtml(tag) }} ({{ Math.round(weight * 100) }}%)</span>
+              </template>
+              <span v-else style="color:var(--text-muted);">暂无数据</span>
+            </div>
+            <div class="admin-detail-section" v-if="detailUser.profile">
+              <h3>偏好分类</h3>
+              <template v-if="detailUser.profile.preferred_categories && detailUser.profile.preferred_categories.length">
+                <span class="admin-tag" v-for="cat in detailUser.profile.preferred_categories" :key="cat">{{ S.escapeHtml(cat) }}</span>
+              </template>
+              <span v-else style="color:var(--text-muted);">暂无数据</span>
+            </div>
+          </template>
+          <template v-else>
+            <p style="color:var(--error);">加载失败</p>
+          </template>
+        </div>
+      </div>
+    </div>
+
   </div>
-
-  <!-- Main Content -->
-  <main class="main-content" style="max-width: 1100px;">
-
-    <!-- Stats Bar -->
-    <div class="admin-stats" id="adminStats">
-      <div class="admin-stat-card">
-        <div class="admin-stat-value" id="totalUsers">-</div>
-        <div class="admin-stat-label">注册用户总数</div>
-      </div>
-      <div class="admin-stat-card">
-        <div class="admin-stat-value" id="adminCount">-</div>
-        <div class="admin-stat-label">管理员</div>
-      </div>
-      <div class="admin-stat-card">
-        <div class="admin-stat-value" id="editorCount">-</div>
-        <div class="admin-stat-label">编辑</div>
-      </div>
-    </div>
-
-    <!-- Search Bar -->
-    <div class="admin-search-bar">
-      <input type="text" id="searchInput" placeholder="搜索用户名或邮箱..." class="admin-search-input">
-      <button class="admin-search-btn" id="searchBtn" onclick="AdminApp.search()">搜索</button>
-      <button class="admin-search-btn admin-search-btn-secondary" onclick="AdminApp.clearSearch()">清除</button>
-    </div>
-
-    <!-- User Table -->
-    <div class="admin-table-wrap">
-      <table class="admin-table" id="userTable">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>用户名</th>
-            <th>邮箱</th>
-            <th>角色</th>
-            <th>状态</th>
-            <th>注册时间</th>
-            <th>最后活跃</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody id="userTableBody">
-          <tr><td colspan="8" class="admin-table-empty">加载中...</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <div class="admin-pagination" id="pagination"></div>
-
-  </main>
-
-  <!-- User Detail Modal -->
-  <div class="admin-modal-overlay" id="detailModal" style="display:none;">
-    <div class="admin-modal">
-      <div class="admin-modal-header">
-        <h2>用户详情</h2>
-        <button class="admin-modal-close" onclick="AdminApp.closeModal()">&times;</button>
-      </div>
-      <div class="admin-modal-body" id="modalBody"></div>
-    </div>
-  </div>
-
-  <style>
-    .admin-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .admin-stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
-      text-align: center;
-    }
-    .admin-stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--accent);
-    }
-    .admin-stat-label {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-top: 4px;
-    }
-    .admin-search-bar {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    .admin-search-input {
-      flex: 1;
-      padding: 10px 16px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-primary);
-      font-size: 14px;
-      outline: none;
-    }
-    .admin-search-input:focus {
-      border-color: var(--accent);
-    }
-    .admin-search-btn {
-      padding: 10px 20px;
-      border-radius: var(--radius-sm);
-      border: none;
-      background: var(--accent);
-      color: #fff;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .admin-search-btn:hover { background: var(--accent-hover); }
-    .admin-search-btn-secondary {
-      background: var(--border);
-    }
-    .admin-search-btn-secondary:hover { background: var(--border-hover); }
-    .admin-table-wrap {
-      overflow-x: auto;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .admin-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    .admin-table th {
-      background: var(--header-bg);
-      color: var(--text-secondary);
-      padding: 12px 14px;
-      text-align: left;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .admin-table td {
-      padding: 10px 14px;
-      border-top: 1px solid var(--border);
-      color: var(--text-primary);
-      white-space: nowrap;
-    }
-    .admin-table tr:hover td {
-      background: var(--info-bg);
-    }
-    .admin-table-empty {
-      text-align: center;
-      color: var(--text-muted);
-      padding: 40px !important;
-    }
-    .admin-role-select {
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text-primary);
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .admin-status-toggle {
-      padding: 4px 12px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .admin-status-toggle.enabled {
-      background: var(--success-bg);
-      color: var(--success);
-      border-color: var(--success);
-    }
-    .admin-status-toggle.disabled {
-      background: var(--error-bg);
-      color: var(--error);
-      border-color: var(--error);
-    }
-    .admin-action-btn {
-      padding: 4px 10px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 13px;
-      cursor: pointer;
-      margin-right: 4px;
-      transition: all 0.2s;
-    }
-    .admin-action-btn:hover {
-      background: var(--info-bg);
-      color: var(--text-primary);
-    }
-    .admin-pagination {
-      display: flex;
-      justify-content: center;
-      gap: 6px;
-      margin-top: 20px;
-    }
-    .admin-page-btn {
-      padding: 6px 14px;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-secondary);
-      font-size: 13px;
-      cursor: pointer;
-    }
-    .admin-page-btn:hover { background: var(--info-bg); }
-    .admin-page-btn.active {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-    .admin-page-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    /* Modal */
-    .admin-modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .admin-modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      width: 90%;
-      max-width: 560px;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    .admin-modal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
-    }
-    .admin-modal-header h2 {
-      font-size: 18px;
-      color: var(--text-primary);
-    }
-    .admin-modal-close {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 24px;
-      cursor: pointer;
-    }
-    .admin-modal-body {
-      padding: 20px;
-    }
-    .admin-detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .admin-detail-label {
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-    .admin-detail-value {
-      color: var(--text-primary);
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .admin-detail-section {
-      margin-top: 16px;
-    }
-    .admin-detail-section h3 {
-      font-size: 15px;
-      color: var(--accent);
-      margin-bottom: 8px;
-    }
-    .admin-tag {
-      display: inline-block;
-      padding: 2px 10px;
-      margin: 2px 4px;
-      border-radius: 12px;
-      font-size: 12px;
-      background: var(--info-bg);
-      color: var(--text-secondary);
-    }
-    @media (max-width: 768px) {
-      .admin-search-bar { flex-direction: column; }
-      .admin-table { font-size: 12px; }
-    }
-  </style>
 
   <script>
-    const AdminApp = (function() {
-      const API_BASE = '/api/v1';
-      let currentPage = 1;
-      let perPage = 20;
-      let totalUsers = 0;
-      let currentSearch = '';
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
+  createApp({
+    setup() {
+      const S = window.aiNewsHub;
+      const loading = ref(false);
+      const users = ref([]);
+      const currentPage = ref(1);
+      const perPage = 20;
+      const totalUsers = ref(0);
+      const searchQuery = ref('');
+      const stats = reactive({ totalUsers: '-', adminCount: '-', editorCount: '-' });
+      const showModal = ref(false);
+      const detailUser = ref(null);
+      const detailLoading = ref(false);
+      const clock = ref('');
+      const navUserArea = ref('');
+      const themeIcon = ref('🌙');
 
-      function authHeaders() {
-        if (typeof Auth !== 'undefined' && Auth.isLoggedIn()) {
-          return Auth.authHeaders();
-        }
-        return {
-          'Content-Type': 'application/json',
-          'X-User-Token': localStorage.getItem('user_token') || '',
-        };
+      const totalPages = computed(() => Math.ceil(totalUsers.value / perPage));
+
+      const pageRange = computed(() => {
+        const total = totalPages.value;
+        const cur = currentPage.value;
+        let start = Math.max(1, cur - 2);
+        let end = Math.min(total, start + 4);
+        if (end - start < 4) start = Math.max(1, end - 4);
+        const range = [];
+        for (let i = start; i <= end; i++) range.push(i);
+        return range;
+      });
+
+      const interestTags = computed(() => {
+        if (!detailUser.value || !detailUser.value.profile || !detailUser.value.profile.interests) return [];
+        return Object.entries(detailUser.value.profile.interests)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 15);
+      });
+
+      function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        try {
+          const d = new Date(dateStr);
+          return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        } catch { return dateStr; }
       }
 
-      async function checkAdmin() {
-        try {
-          const res = await fetch(API_BASE + '/auth/me', { headers: authHeaders() });
-          if (res.status === 401 || res.status === 403) {
-            window.location.href = '/';
-            return false;
-          }
-          const data = await res.json();
-          if (!data.user || data.user.role !== 'admin') {
-            window.location.href = '/';
-            return false;
-          }
-          return true;
-        } catch(e) {
-          console.error('Admin check failed:', e);
-          window.location.href = '/';
-          return false;
-        }
+      function updateClock() {
+        clock.value = new Date().toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', weekday:'short' });
       }
 
       async function loadStats() {
         try {
-          // Get user counts from the first page
-          const res = await fetch(API_BASE + '/admin/users?page=1&per_page=1', { headers: authHeaders() });
-          if (res.status === 403) { window.location.href = '/'; return; }
-          const data = await res.json();
-          document.getElementById('totalUsers').textContent = data.total || '-';
-
-          // Get role counts
-          const allRes = await fetch(API_BASE + '/admin/users?per_page=1000', { headers: authHeaders() });
-          const allData = await allRes.json();
+          const data = await S.api.get('/admin/users?page=1&per_page=1');
+          stats.totalUsers = data.total || '-';
+          const allData = await S.api.get('/admin/users?per_page=1000');
           let adminC = 0, editorC = 0;
           if (allData.users) {
             allData.users.forEach(u => {
@@ -387,297 +221,142 @@
               if (u.role === 'editor') editorC++;
             });
           }
-          document.getElementById('adminCount').textContent = adminC;
-          document.getElementById('editorCount').textContent = editorC;
-        } catch(e) {
-          console.error('Failed to load stats:', e);
-        }
+          stats.adminCount = adminC;
+          stats.editorCount = editorC;
+        } catch(e) { console.error('loadStats error', e); }
       }
 
       async function loadUsers() {
-        const tbody = document.getElementById('userTableBody');
-        tbody.innerHTML = '<tr><td colspan="8" class="admin-table-empty">加载中...</td></tr>';
-
-        let url = API_BASE + '/admin/users?page=' + currentPage + '&per_page=' + perPage;
-        if (currentSearch) url += '&search=' + encodeURIComponent(currentSearch);
-
+        loading.value = true;
+        let path = '/admin/users?page=' + currentPage.value + '&per_page=' + perPage;
+        if (searchQuery.value) path += '&search=' + encodeURIComponent(searchQuery.value);
         try {
-          const res = await fetch(url, { headers: authHeaders() });
-          if (res.status === 403) { window.location.href = '/'; return; }
-          const data = await res.json();
-
-          totalUsers = data.total || 0;
-          const users = data.users || [];
-
-          if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="admin-table-empty">没有找到用户</td></tr>';
-            renderPagination();
-            return;
-          }
-
-          tbody.innerHTML = users.map(u => renderRow(u)).join('');
-          renderPagination();
+          const data = await S.api.get(path);
+          totalUsers.value = data.total || 0;
+          users.value = data.users || [];
         } catch(e) {
-          tbody.innerHTML = '<tr><td colspan="8" class="admin-table-empty">加载失败: ' + escapeHtml(e.message) + '</td></tr>';
+          S.showToast('加载失败');
+        } finally {
+          loading.value = false;
         }
       }
 
-      function renderRow(u) {
-        const username = u.username || '(匿名)';
-        const email = u.email || '-';
-        const role = u.role || 'anonymous';
-        const disabled = u.disabled ? 'disabled' : 'enabled';
-        const statusText = u.disabled ? '已禁用' : '正常';
-
-        return '<tr>' +
-          '<td>' + u.id + '</td>' +
-          '<td>' + escapeHtml(username) + '</td>' +
-          '<td>' + escapeHtml(email) + '</td>' +
-          '<td>' +
-            '<select class="admin-role-select" data-id="' + u.id + '" data-current="' + role + '" onchange="AdminApp.changeRole(this)">' +
-              '<option value="viewer"' + (role === 'viewer' ? ' selected' : '') + '>viewer</option>' +
-              '<option value="editor"' + (role === 'editor' ? ' selected' : '') + '>editor</option>' +
-              '<option value="admin"' + (role === 'admin' ? ' selected' : '') + '>admin</option>' +
-              '<option value="anonymous"' + (role === 'anonymous' ? ' selected' : '') + '>anonymous</option>' +
-            '</select>' +
-          '</td>' +
-          '<td><button class="admin-status-toggle ' + disabled + '" data-id="' + u.id + '" data-disabled="' + u.disabled + '" onclick="AdminApp.toggleStatus(this)">' + statusText + '</button></td>' +
-          '<td>' + formatDate(u.created_at) + '</td>' +
-          '<td>' + formatDate(u.last_seen_at) + '</td>' +
-          '<td><button class="admin-action-btn" onclick="AdminApp.showDetail(' + u.id + ')">详情</button></td>' +
-        '</tr>';
-      }
-
-      function renderPagination() {
-        const totalPages = Math.ceil(totalUsers / perPage);
-        if (totalPages <= 1) {
-          document.getElementById('pagination').innerHTML = '';
-          return;
-        }
-
-        let html = '';
-        html += '<button class="admin-page-btn" ' + (currentPage <= 1 ? 'disabled' : '') + ' onclick="AdminApp.goPage(' + (currentPage - 1) + ')">上一页</button>';
-
-        let start = Math.max(1, currentPage - 2);
-        let end = Math.min(totalPages, start + 4);
-        if (end - start < 4) start = Math.max(1, end - 4);
-
-        for (let i = start; i <= end; i++) {
-          html += '<button class="admin-page-btn' + (i === currentPage ? ' active' : '') + '" onclick="AdminApp.goPage(' + i + ')">' + i + '</button>';
-        }
-
-        html += '<button class="admin-page-btn" ' + (currentPage >= totalPages ? 'disabled' : '') + ' onclick="AdminApp.goPage(' + (currentPage + 1) + ')">下一页</button>';
-        document.getElementById('pagination').innerHTML = html;
-      }
-
-      async function changeRole(selectEl) {
-        const id = selectEl.dataset.id;
-        const newRole = selectEl.value;
-        const oldRole = selectEl.dataset.current;
-
-        if (newRole === oldRole) return;
-        if (!confirm('确定将用户 #' + id + ' 的角色改为 ' + newRole + '？')) {
-          selectEl.value = oldRole;
-          return;
-        }
-
+      async function checkAdmin() {
         try {
-          const res = await fetch(API_BASE + '/admin/users/' + id + '/role', {
-            method: 'PUT',
-            headers: authHeaders(),
-            body: JSON.stringify({ role: newRole }),
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            selectEl.dataset.current = newRole;
+          const data = await S.api.get('/auth/me');
+          if (!data.user || data.user.role !== 'admin') {
+            window.location.href = '/';
+            return false;
+          }
+          return true;
+        } catch(e) {
+          window.location.href = '/';
+          return false;
+        }
+      }
+
+      async function changeRole(e, user) {
+        const newRole = e.target.value;
+        const oldRole = user.role;
+        if (newRole === oldRole) return;
+        if (!confirm('确定将用户 #' + user.id + ' 的角色改为 ' + newRole + '？')) {
+          e.target.value = oldRole;
+          return;
+        }
+        try {
+          const data = await S.api.put('/admin/users/' + user.id + '/role', { role: newRole });
+          if (data.success) {
+            user.role = newRole;
             loadStats();
           } else {
-            alert(data.message || '操作失败');
-            selectEl.value = oldRole;
+            S.showToast(data.message || '操作失败');
+            e.target.value = oldRole;
           }
         } catch(e) {
-          alert('请求失败: ' + e.message);
-          selectEl.value = oldRole;
+          S.showToast('请求失败');
+          e.target.value = oldRole;
         }
       }
 
-      async function toggleStatus(btn) {
-        const id = btn.dataset.id;
-        const currentlyDisabled = btn.dataset.disabled === 'true';
-        const newDisabled = !currentlyDisabled;
-
-        if (newDisabled && !confirm('确定禁用用户 #' + id + '？')) return;
-
+      async function toggleStatus(user) {
+        const newDisabled = !user.disabled;
+        if (newDisabled && !confirm('确定禁用用户 #' + user.id + '？')) return;
         try {
-          const res = await fetch(API_BASE + '/admin/users/' + id + '/status', {
-            method: 'PUT',
-            headers: authHeaders(),
-            body: JSON.stringify({ disabled: newDisabled }),
-          });
-          const data = await res.json();
-          if (res.ok && data.success) {
-            btn.dataset.disabled = String(newDisabled);
-            btn.className = 'admin-status-toggle ' + (newDisabled ? 'disabled' : 'enabled');
-            btn.textContent = newDisabled ? '已禁用' : '正常';
+          const data = await S.api.put('/admin/users/' + user.id + '/status', { disabled: newDisabled });
+          if (data.success) {
+            user.disabled = newDisabled;
           } else {
-            alert(data.message || '操作失败');
+            S.showToast(data.message || '操作失败');
           }
-        } catch(e) {
-          alert('请求失败: ' + e.message);
-        }
+        } catch(e) { S.showToast('请求失败'); }
       }
 
       async function showDetail(id) {
-        const modal = document.getElementById('detailModal');
-        const body = document.getElementById('modalBody');
-        body.innerHTML = '<p style="color:var(--text-muted);">加载中...</p>';
-        modal.style.display = 'flex';
-
+        showModal.value = true;
+        detailUser.value = null;
+        detailLoading.value = true;
         try {
-          const res = await fetch(API_BASE + '/admin/users/' + id, { headers: authHeaders() });
-          const data = await res.json();
-          if (!res.ok) {
-            body.innerHTML = '<p style="color:var(--error);">' + escapeHtml(data.message || '加载失败') + '</p>';
-            return;
-          }
-
-          let html = '';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">ID</span><span class="admin-detail-value">' + data.id + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">用户名</span><span class="admin-detail-value">' + escapeHtml(data.username || '(匿名)') + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">邮箱</span><span class="admin-detail-value">' + escapeHtml(data.email || '-') + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">角色</span><span class="admin-detail-value">' + escapeHtml(data.role) + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">状态</span><span class="admin-detail-value">' + (data.disabled ? '已禁用' : '正常') + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">注册时间</span><span class="admin-detail-value">' + formatDate(data.created_at) + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">最后活跃</span><span class="admin-detail-value">' + formatDate(data.last_seen_at) + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">收藏数</span><span class="admin-detail-value">' + (data.total_bookmarks || 0) + '</span></div>';
-          html += '<div class="admin-detail-row"><span class="admin-detail-label">阅读数</span><span class="admin-detail-value">' + (data.total_reads || 0) + '</span></div>';
-
-          if (data.profile) {
-            html += '<div class="admin-detail-section"><h3>兴趣标签</h3>';
-            if (data.profile.interests) {
-              const tags = Object.entries(data.profile.interests).sort((a,b) => b[1] - a[1]).slice(0, 15);
-              tags.forEach(([tag, weight]) => {
-                html += '<span class="admin-tag">' + escapeHtml(tag) + ' (' + (weight * 100).toFixed(0) + '%)</span>';
-              });
-            } else {
-              html += '<span style="color:var(--text-muted);">暂无数据</span>';
-            }
-            html += '</div>';
-
-            html += '<div class="admin-detail-section"><h3>偏好分类</h3>';
-            if (data.profile.preferred_categories && data.profile.preferred_categories.length > 0) {
-              data.profile.preferred_categories.forEach(cat => {
-                html += '<span class="admin-tag">' + escapeHtml(cat) + '</span>';
-              });
-            } else {
-              html += '<span style="color:var(--text-muted);">暂无数据</span>';
-            }
-            html += '</div>';
-          }
-
-          body.innerHTML = html;
+          const data = await S.api.get('/admin/users/' + id);
+          detailUser.value = data;
         } catch(e) {
-          body.innerHTML = '<p style="color:var(--error);">请求失败: ' + escapeHtml(e.message) + '</p>';
+          S.showToast('加载失败');
+        } finally {
+          detailLoading.value = false;
         }
       }
 
       function closeModal() {
-        document.getElementById('detailModal').style.display = 'none';
+        showModal.value = false;
+        detailUser.value = null;
       }
 
       function search() {
-        currentSearch = document.getElementById('searchInput').value.trim();
-        currentPage = 1;
+        currentPage.value = 1;
         loadUsers();
       }
 
       function clearSearch() {
-        document.getElementById('searchInput').value = '';
-        currentSearch = '';
-        currentPage = 1;
+        searchQuery.value = '';
+        currentPage.value = 1;
         loadUsers();
       }
 
       function goPage(page) {
-        currentPage = page;
+        currentPage.value = page;
         loadUsers();
       }
 
-      function formatDate(dateStr) {
-        if (!dateStr) return '-';
-        try {
-          const d = new Date(dateStr);
-          return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-        } catch(e) {
-          return dateStr;
-        }
+      function updateThemeIcon() {
+        themeIcon.value = (document.documentElement.getAttribute('data-theme') || 'dark') === 'light' ? '🌙' : '☀️';
       }
 
-      function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-      }
-
-      async function init() {
-        const isAdmin = await checkAdmin();
-        if (!isAdmin) return;
-        loadStats();
-        loadUsers();
-
-        // Enter key for search
-        document.getElementById('searchInput').addEventListener('keydown', function(e) {
-          if (e.key === 'Enter') search();
-        });
-
-        // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        const saved = localStorage.getItem('theme');
-        if (saved === 'light') {
-          document.documentElement.classList.add('light');
-          themeToggle.textContent = '☀️';
-        }
-        themeToggle.addEventListener('click', function() {
-          document.documentElement.classList.toggle('light');
-          const isLight = document.documentElement.classList.contains('light');
-          themeToggle.textContent = isLight ? '☀️' : '🌙';
-          localStorage.setItem('theme', isLight ? 'light' : 'dark');
-        });
-
-        // Clock
-        function updateClock() {
-          const now = new Date();
-          const el = document.getElementById('headerClock');
-          if (el) el.textContent = now.toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', weekday:'short' });
-        }
+      onMounted(async () => {
+        S.initTheme();
+        updateThemeIcon();
         updateClock();
         setInterval(updateClock, 30000);
+        navUserArea.value = '';
+        S.initAuth();
 
-        // Close modal on overlay click
-        document.getElementById('detailModal').addEventListener('click', function(e) {
-          if (e.target === this) closeModal();
-        });
-        // Close modal on ESC
-        document.addEventListener('keydown', function(e) {
-          if (e.key === 'Escape') closeModal();
-        });
+        const isAdmin = await checkAdmin();
+        if (!isAdmin) return;
+        await loadStats();
+        await loadUsers();
 
-        // Init Auth UI if available
-        if (typeof Auth !== 'undefined') {
-          Auth.init();
-        }
-      }
+        // ESC to close modal
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+      });
 
       return {
-        init, search, clearSearch, changeRole, toggleStatus, showDetail, closeModal, goPage
+        S, loading, users, currentPage, totalPages, searchQuery, stats,
+        showModal, detailUser, detailLoading, clock, navUserArea, themeIcon,
+        pageRange, interestTags, formatDate, changeRole, toggleStatus,
+        showDetail, closeModal, search, clearSearch, goPage,
       };
-    })();
-
-    document.addEventListener('DOMContentLoaded', AdminApp.init);
+    }
+  }).mount('#app');
   </script>
-
   <script src="js/store.js"></script>
   <script src="js/common.js"></script>
-
 </body>
 </html>

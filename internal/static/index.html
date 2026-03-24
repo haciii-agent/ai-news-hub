@@ -4,395 +4,318 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AI News Hub — AI 资讯聚合</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 <body>
-
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="/" class="header-logo">
-        <span class="logo-icon">📰</span>
-        <span>AI News <span class="logo-text-accent">Hub</span></span>
-      </a>
-      <span class="header-clock"></span>
-    </div>
-    <div class="header-right">
-      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
-      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
-      <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
-      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-      <div class="search-container">
-        <button class="search-toggle" id="searchToggle" title="搜索 (/)">🔍</button>
-        <div class="search-input-wrap" id="searchInputWrap" style="display:none">
-          <input type="text" class="search-input" id="searchInput" placeholder="搜索新闻..." autocomplete="off">
-          <button class="search-clear" id="searchClear" style="display:none">✕</button>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="header-logo">
+          <span class="logo-icon">📰</span>
+          <span>AI News <span class="logo-text-accent">Hub</span></span>
+        </a>
+        <span class="header-clock"></span>
+      </div>
+      <div class="header-right">
+        <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
+        <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+        <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
+        <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+        <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+        <div class="search-container">
+          <button class="search-toggle" @click="toggleSearch" title="搜索 (/)">🔍</button>
+          <div class="search-input-wrap" v-if="searchVisible">
+            <input type="text" class="search-input" v-model="headerSearch" @keydown.enter="doHeaderSearch" placeholder="搜索新闻..." autocomplete="off">
+            <button class="search-clear" v-if="headerSearch" @click="clearHeaderSearch">✕</button>
+          </div>
         </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Stats Bar -->
-  <div class="stats-bar">
-    <span class="stat-item">共 <span class="stat-value" id="statTotal">—</span> 篇</span>
-    <span class="stat-sep">·</span>
-    <span class="stat-item">中文 <span class="stat-value" id="statZh">—</span></span>
-    <span class="stat-sep">·</span>
-    <span class="stat-item">EN <span class="stat-value" id="statEn">—</span></span>
-    <span class="stat-sep">·</span>
-    <span class="stat-item">分类 <span class="stat-value" id="statCategories">—</span></span>
-    <span class="stat-sep">·</span>
-    <span class="stat-item">上次采集 <span class="stat-value" id="statLastCollect">—</span></span>
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <span class="stat-item">共 <span class="stat-value">{{ stats.total }}</span> 篇</span>
+      <span class="stat-sep">·</span>
+      <span class="stat-item">中文 <span class="stat-value">{{ stats.zh }}</span></span>
+      <span class="stat-sep">·</span>
+      <span class="stat-item">EN <span class="stat-value">{{ stats.en }}</span></span>
+      <span class="stat-sep">·</span>
+      <span class="stat-item">分类 <span class="stat-value">{{ stats.categories }}</span></span>
+      <span class="stat-sep">·</span>
+      <span class="stat-item">上次采集 <span class="stat-value">{{ stats.lastCollect }}</span></span>
+    </div>
+
+    <!-- Category Tabs -->
+    <div class="category-tabs-wrap">
+      <button class="category-tab" :class="{ active: currentCategory === '' }" @click="selectCategory('')">全部</button>
+      <button class="category-tab" v-for="cat in categories" :key="cat.name" :class="{ active: currentCategory === cat.name }" @click="selectCategory(cat.name)">
+        {{ cat.name }} <span class="cat-count">{{ cat.count }}</span>
+      </button>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-bar-wrap">
+      <div class="search-bar">
+        <input type="text" class="search-bar-input" v-model="searchQuery" @keyup.enter="doSearch" @keyup.escape="clearSearchBar" placeholder="搜索新闻标题或摘要..." autocomplete="off">
+        <button class="search-bar-btn" @click="doSearch">🔍</button>
+        <button class="search-bar-clear" v-if="searchQuery" @click="clearSearchBar">✕</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="loading-spinner" v-if="loading && !articles.length"><span>加载中...</span></div>
+      <div class="empty-state" v-if="!loading && !articles.length && !isSearchMode">
+        <p>暂无文章</p>
+        <button class="retry-btn" @click="loadArticles()">重试</button>
+      </div>
+      <div class="empty-state" v-if="!loading && !articles.length && isSearchMode">
+        <p>没有找到相关文章</p>
+      </div>
+      <div class="article-list" v-html="renderedArticles"></div>
+      <div class="load-more-wrap" v-if="hasMore && !loading">
+        <button class="load-more-btn" @click="loadMore">加载更多</button>
+      </div>
+      <div class="load-more-wrap" v-if="loading && articles.length">
+        <button class="load-more-btn" disabled>加载中...</button>
+      </div>
+    </main>
+
+    <!-- Stats Footer -->
+    <div class="stats-footer" v-if="articles.length">{{ displayedCount }} 篇</div>
+
+    <!-- Footer -->
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
   </div>
-
-  <!-- Category Tabs -->
-  <div class="category-tabs-wrap" id="categoryTabsWrap">
-    <button class="category-tab active" data-category="">全部</button>
-  </div>
-
-  <!-- Search Bar -->
-  <div class="search-bar-wrap">
-    <div class="search-bar">
-      <input type="text" class="search-bar-input" id="searchBarInput" placeholder="搜索新闻标题或摘要..." autocomplete="off">
-      <button class="search-bar-btn" id="searchBarBtn">🔍</button>
-      <button class="search-bar-clear" id="searchBarClear" style="display:none">✕</button>
-    </div>
-  </div>
-
-  <!-- Main Content -->
-  <main class="main-content">
-    <div class="loading-spinner" id="loadingSpinner" style="display:none"><span>加载中...</span></div>
-    <div class="empty-state" id="emptyState" style="display:none">
-      <p>暂无文章</p>
-      <button class="retry-btn" id="retryBtn">重试</button>
-    </div>
-    <div class="article-list" id="articleList"></div>
-    <div class="load-more-wrap" id="loadMoreWrap" style="display:none">
-      <button class="load-more-btn" id="loadMoreBtn">加载更多</button>
-    </div>
-  </main>
-
-  <!-- Stats Footer -->
-  <div class="stats-footer" id="statsFooter"></div>
-
-  <!-- Footer -->
-  <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
-
-  <!-- Toast -->
-  <div id="toast"></div>
-
-  <!-- Store -->
-  <script src="js/store.js"></script>
-  <!-- Common -->
-  <script src="js/common.js"></script>
 
   <script>
-  (function () {
-    'use strict';
+  const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
+  createApp({
+    setup() {
+      const S = window.aiNewsHub;
+      const PER_PAGE = 20;
+      const articles = ref([]);
+      const loading = ref(false);
+      const currentPage = ref(1);
+      const totalPages = ref(1);
+      const currentCategory = ref('');
+      const currentLang = ref('all');
+      const isSearchMode = ref(false);
+      const searchQuery = ref('');
+      const headerSearch = ref('');
+      const searchVisible = ref(false);
+      const categories = ref([]);
+      const bookmarkState = reactive({});
+      const stats = reactive({ total: '—', zh: '—', en: '—', categories: '—', lastCollect: '—' });
+      const renderedArticles = ref('');
+      const displayedCount = ref(0);
+      const hasMore = ref(false);
 
-    const S = window.aiNewsHub;
-    const PER_PAGE = 20;
+      const displayedCats = computed(() => categories.value);
 
-    // State
-    let currentLang = 'all';
-    let currentCategory = '';
-    let currentPage = 1;
-    let totalPages = 1;
-    let isSearchMode = false;
-    let currentSearchQuery = '';
-    let bookmarkState = {};
-
-    // DOM
-    const articleList = document.getElementById('articleList');
-    const loadingSpinner = document.getElementById('loadingSpinner');
-    const emptyState = document.getElementById('emptyState');
-    const loadMoreWrap = document.getElementById('loadMoreWrap');
-    const loadMoreBtn = document.getElementById('loadMoreBtn');
-    const statsFooter = document.getElementById('statsFooter');
-    const statTotal = document.getElementById('statTotal');
-    const statZh = document.getElementById('statZh');
-    const statEn = document.getElementById('statEn');
-    const statCategories = document.getElementById('statCategories');
-    const statLastCollect = document.getElementById('statLastCollect');
-    const categoryTabsWrap = document.getElementById('categoryTabsWrap');
-    const searchToggle = document.getElementById('searchToggle');
-    const searchInputWrap = document.getElementById('searchInputWrap');
-    const searchInput = document.getElementById('searchInput');
-    const searchClear = document.getElementById('searchClear');
-    const searchBarInput = document.getElementById('searchBarInput');
-    const searchBarBtn = document.getElementById('searchBarBtn');
-    const searchBarClear = document.getElementById('searchBarClear');
-
-    // ─── Init ───────────────────────────────────────────────────────────────
-
-    function init() {
-      aiNewsCommon.renderHeader();
-      aiNewsCommon.initPage();
-      aiNewsCommon.bindGlobalEvents();
-
-      // Parse URL search
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('q')) {
-        currentSearchQuery = params.get('q');
-        searchBarInput.value = currentSearchQuery;
-        searchBarClear.style.display = '';
-        isSearchMode = true;
+      function toggleSearch() {
+        searchVisible.value = !searchVisible.value;
+        if (searchVisible.value) nextTick(() => document.querySelector('.search-input')?.focus());
       }
 
-      bindEvents();
-      loadCategories();
-      loadArticles();
-    }
+      function clearHeaderSearch() {
+        headerSearch.value = '';
+        searchVisible.value = false;
+      }
 
-    // ─── Events ────────────────────────────────────────────────────────────
-
-    function bindEvents() {
-      searchToggle.addEventListener('click', toggleSearch);
-      searchClear.addEventListener('click', clearSearch);
-      searchBarBtn.addEventListener('click', doSearch);
-      searchBarClear.addEventListener('click', clearSearchBar);
-      searchBarInput.addEventListener('keyup', (e) => {
-        searchBarClear.style.display = searchBarInput.value ? '' : 'none';
-        if (e.key === 'Enter') doSearch();
-        if (e.key === 'Escape') clearSearchBar();
-      });
-      loadMoreBtn.addEventListener('click', loadMore);
-      document.getElementById('retryBtn').addEventListener('click', () => loadArticles());
-    }
-
-    // ─── Search ────────────────────────────────────────────────────────────
-
-    function toggleSearch() {
-      const show = searchInputWrap.style.display === 'none';
-      searchInputWrap.style.display = show ? '' : 'none';
-      if (show) { searchInput.focus(); }
-    }
-
-    function clearSearch() {
-      searchInput.value = '';
-      searchInputWrap.style.display = 'none';
-    }
-
-    function doSearch() {
-      const q = searchBarInput.value.trim();
-      if (!q) return;
-      currentSearchQuery = q;
-      isSearchMode = true;
-      searchBarClear.style.display = '';
-      currentPage = 1;
-      articleList.innerHTML = '';
-      loadArticles();
-    }
-
-    function clearSearchBar() {
-      searchBarInput.value = '';
-      searchBarClear.style.display = 'none';
-      if (currentSearchQuery) {
-        currentSearchQuery = '';
-        isSearchMode = false;
-        currentPage = 1;
-        articleList.innerHTML = '';
+      function doHeaderSearch() {
+        if (!headerSearch.value.trim()) return;
+        searchQuery.value = headerSearch.value.trim();
+        isSearchMode.value = true;
+        currentPage.value = 1;
+        articles.value = [];
         loadArticles();
       }
-    }
 
-    // ─── Load categories ──────────────────────────────────────────────────
+      function doSearch() {
+        const q = searchQuery.value.trim();
+        isSearchMode.value = !!q;
+        currentPage.value = 1;
+        articles.value = [];
+        loadArticles();
+      }
 
-    async function loadCategories() {
-      try {
-        const data = await S.api.get('/categories');
-        if (!data.categories) return;
+      function clearSearchBar() {
+        searchQuery.value = '';
+        if (isSearchMode.value) {
+          isSearchMode.value = false;
+          currentPage.value = 1;
+          articles.value = [];
+          loadArticles();
+        }
+      }
 
-        let total = 0;
-        let zhCount = 0;
-
-        categoryTabsWrap.innerHTML = '<button class="category-tab active" data-category="">全部</button>';
-        data.categories.forEach(cat => {
-          total += cat.count;
-          categoryTabsWrap.innerHTML +=
-            '<button class="category-tab" data-category="' + S.escapeHtml(cat.name) + '">' +
-            S.escapeHtml(cat.name) + ' <span class="cat-count">' + cat.count + '</span></button>';
-        });
-
-        statTotal.textContent = total;
-        statCategories.textContent = data.categories.length;
-
-        categoryTabsWrap.querySelectorAll('.category-tab').forEach(btn => {
-          btn.addEventListener('click', () => selectCategory(btn.dataset.category));
-        });
-
-        // Get language breakdown from dashboard stats
+      async function loadCategories() {
         try {
-          const stats = await S.api.get('/dashboard/stats');
-          if (stats.stats) {
-            statZh.textContent = stats.stats.zh || '—';
-            statEn.textContent = stats.stats.en || '—';
-          }
-        } catch {}
+          const data = await S.api.get('/categories');
+          if (!data.categories) return;
+          categories.value = data.categories;
+          let total = 0;
+          data.categories.forEach(cat => { total += cat.count; });
+          stats.total = total;
+          stats.categories = data.categories.length;
+          // Language stats
+          try {
+            const st = await S.api.get('/dashboard/stats');
+            if (st.stats) { stats.zh = st.stats.zh || '—'; stats.en = st.stats.en || '—'; }
+          } catch {}
+          // Last collect time
+          try {
+            const cs = await S.api.get('/collect/status');
+            if (cs && cs.started_at) {
+              const d = new Date(cs.started_at);
+              stats.lastCollect = d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            } else { stats.lastCollect = '从未'; }
+          } catch { stats.lastCollect = '从未'; }
+        } catch(e) { console.error('loadCategories error', e); }
+      }
 
-        // Last collect time
+      async function loadArticles(append) {
+        if (!append) loading.value = true;
         try {
-          const cs = await S.api.get('/collect/status');
-          if (cs && cs.started_at) {
-            const d = new Date(cs.started_at);
-            statLastCollect.textContent = d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          let path = '/articles?page=' + currentPage.value + '&per_page=' + PER_PAGE + '&lang=' + currentLang.value;
+          if (currentCategory.value) path += '&category=' + encodeURIComponent(currentCategory.value);
+          if (searchQuery.value) path += '&q=' + encodeURIComponent(searchQuery.value);
+          const data = await S.api.get(path);
+          const list = Array.isArray(data.articles) ? data.articles : [];
+          if (append) {
+            articles.value.push(...list);
           } else {
-            statLastCollect.textContent = '从未';
+            articles.value = list;
           }
-        } catch { statLastCollect.textContent = '从未'; }
-
-      } catch (e) { console.error('loadCategories error', e); }
-    }
-
-    // ─── Load articles ─────────────────────────────────────────────────────
-
-    async function loadArticles(append) {
-      if (!append) {
-        loadingSpinner.style.display = '';
-        emptyState.style.display = 'none';
-        articleList.innerHTML = '';
-      }
-      loadMoreWrap.style.display = 'none';
-
-      try {
-        let path = '/articles?page=' + currentPage + '&per_page=' + PER_PAGE + '&lang=' + currentLang;
-        if (currentCategory) path += '&category=' + encodeURIComponent(currentCategory);
-        if (currentSearchQuery) path += '&q=' + encodeURIComponent(currentSearchQuery);
-
-        const data = await S.api.get(path);
-        const list = Array.isArray(data.articles) ? data.articles : [];
-
-        if (!append) loadingSpinner.style.display = 'none';
-
-        if (!list.length && !append) {
-          emptyState.style.display = '';
-          return;
+          renderArticles();
+          hasMore.value = list.length >= PER_PAGE;
+          displayedCount.value = articles.value.length;
+          await nextTick();
+          bindBookmarkBtns();
+          if (list.length) loadBookmarkStatus(list.map(a => a.id));
+        } catch(e) {
+          console.error('loadArticles error', e);
+        } finally {
+          loading.value = false;
         }
-
-        if (append) {
-          articleList.insertAdjacentHTML('beforeend', renderArticles(list));
-        } else {
-          articleList.innerHTML = renderArticles(list);
-        }
-
-        loadMoreWrap.style.display = list.length >= PER_PAGE ? '' : 'none';
-        statsFooter.textContent = '显示 ' + articleList.querySelectorAll('.article-card').length + ' 篇';
-
-        // Bind bookmark buttons
-        articleList.querySelectorAll('.bookmark-btn').forEach(btn => {
-          btn.addEventListener('click', () => toggleBookmark(btn));
-        });
-
-        // Load bookmark status
-        loadBookmarkStatus(list.map(a => a.id));
-
-      } catch (e) {
-        loadingSpinner.style.display = 'none';
-        if (!append) emptyState.style.display = '';
-        console.error('loadArticles error', e);
       }
-    }
 
-    function renderArticles(articles) {
-      return articles.map(a => {
-        const cats = (a.categories || '').split(',').filter(c => c.trim());
-        const catTags = cats.map(c =>
-          '<span class="article-tag ' + S.getCategoryClass(c.trim()) + '">' + S.escapeHtml(c.trim()) + '</span>'
-        ).join('');
-        const bm = bookmarkState[a.id] ? '📌' : '📍';
-        const bmClass = bookmarkState[a.id] ? ' bookmarked' : '';
-        return '<article class="article-card" data-id="' + a.id + '">' +
-          '<div class="article-meta">' +
-            '<span class="article-source">' + S.escapeHtml(a.source || '') + '</span>' +
-            '<span class="article-sep">·</span>' +
-            '<span class="article-time">' + S.formatTime(a.published_at) + '</span>' +
-            '<span class="lang-badge' + (a.language === 'zh' ? '">中文' : ' lang-en">EN') + '</span>' +
-          '</div>' +
-          '<h2 class="article-title">' +
-            '<a href="/article.html?id=' + a.id + '" target="_blank" onclick="window._recordRead(' + a.id + ',\'' + S.escapeHtml(a.title || '').replace(/'/g, "\\'") + '\',\'' + S.escapeHtml(a.source || '').replace(/'/g, "\\'") + '\')">' + S.escapeHtml(a.title || '') + '</a>' +
-          '</h2>' +
-          (a.summary ? '<p class="article-summary">' + S.escapeHtml(a.summary) + '</p>' : '') +
-          '<div class="article-footer">' +
-            '<div class="article-tags">' + catTags + '</div>' +
-            '<div class="article-actions">' +
-              '<button class="action-btn bookmark-btn' + bmClass + '" data-id="' + a.id + '" data-title="' + S.escapeHtml(a.title || '').replace(/"/g, '&quot;') + '" data-source="' + S.escapeHtml(a.source || '').replace(/"/g, '&quot;') + '" title="收藏">' + bm + '</button>' +
+      function renderArticles() {
+        renderedArticles.value = articles.value.map(a => {
+          const cats = (a.categories || '').split(',').filter(c => c.trim());
+          const catTags = cats.map(c =>
+            '<span class="article-tag ' + S.getCategoryClass(c.trim()) + '">' + S.escapeHtml(c.trim()) + '</span>'
+          ).join('');
+          const bm = bookmarkState[a.id] ? '📌' : '📍';
+          const bmClass = bookmarkState[a.id] ? ' bookmarked' : '';
+          const titleEsc = S.escapeHtml(a.title || '').replace(/'/g, "\\'");
+          return '<article class="article-card" data-id="' + a.id + '">' +
+            '<div class="article-meta">' +
+              '<span class="article-source">' + S.escapeHtml(a.source || '') + '</span>' +
+              '<span class="article-sep">·</span>' +
+              '<span class="article-time">' + S.formatTime(a.published_at) + '</span>' +
+              '<span class="lang-badge' + (a.language === 'zh' ? '">中文' : ' lang-en">EN') + '</span>' +
             '</div>' +
-          '</div>' +
-        '</article>';
-      }).join('');
-    }
+            '<h2 class="article-title">' +
+              '<a href="/article.html?id=' + a.id + '" target="_blank" onclick="window._recordRead(' + a.id + ',\'' + titleEsc + '\',\'' + S.escapeHtml(a.source || '').replace(/'/g, "\\'") + '\')">' + S.escapeHtml(a.title || '') + '</a>' +
+            '</h2>' +
+            (a.summary ? '<p class="article-summary">' + S.escapeHtml(a.summary) + '</p>' : '') +
+            '<div class="article-footer">' +
+              '<div class="article-tags">' + catTags + '</div>' +
+              '<div class="article-actions">' +
+                '<button class="action-btn bookmark-btn' + bmClass + '" data-id="' + a.id + '" data-title="' + S.escapeHtml(a.title || '').replace(/"/g, '&quot;') + '" data-source="' + S.escapeHtml(a.source || '').replace(/"/g, '&quot;') + '" title="收藏">' + bm + '</button>' +
+              '</div>' +
+            '</div>' +
+          '</article>';
+        }).join('');
+      }
 
-    async function loadBookmarkStatus(ids) {
-      if (!ids.length) return;
-      try {
-        const data = await S.api.get('/bookmarks/status?ids=' + ids.join(','));
-        const status = data.status || {};
-        Object.assign(bookmarkState, status);
-        ids.forEach(id => {
-          const btn = articleList.querySelector('.bookmark-btn[data-id="' + id + '"]');
-          if (btn) {
-            btn.classList.toggle('bookmarked', !!status[id]);
-            btn.textContent = status[id] ? '📌' : '📍';
-          }
+      function bindBookmarkBtns() {
+        document.querySelectorAll('.bookmark-btn').forEach(btn => {
+          btn.onclick = () => toggleBookmark(btn);
         });
-      } catch {}
-    }
+      }
 
-    async function toggleBookmark(btn) {
-      if (!S.isLoggedIn()) { S.showToast('请先登录'); return; }
-      const id = parseInt(btn.dataset.id);
-      const title = btn.dataset.title;
-      const source = btn.dataset.source;
-      const isBookmarked = bookmarkState[id];
-      try {
-        if (isBookmarked) {
-          await S.api.del('/bookmarks/' + id);
-          bookmarkState[id] = false;
-          btn.classList.remove('bookmarked');
-          btn.textContent = '📍';
-          S.showToast('已取消收藏');
-        } else {
-          await S.api.post('/bookmarks', { article_id: id, title, source });
-          bookmarkState[id] = true;
-          btn.classList.add('bookmarked');
-          btn.textContent = '📌';
-          S.showToast('已收藏');
+      async function loadBookmarkStatus(ids) {
+        if (!ids.length) return;
+        try {
+          const data = await S.api.get('/bookmarks/status?ids=' + ids.join(','));
+          const status = data.status || {};
+          Object.assign(bookmarkState, status);
+          renderArticles();
+          await nextTick();
+          bindBookmarkBtns();
+        } catch {}
+      }
+
+      async function toggleBookmark(btn) {
+        if (!S.isLoggedIn()) { S.showToast('请先登录'); return; }
+        const id = parseInt(btn.dataset.id);
+        const title = btn.dataset.title;
+        const source = btn.dataset.source;
+        const isBookmarked = bookmarkState[id];
+        try {
+          if (isBookmarked) {
+            await S.api.del('/bookmarks/' + id);
+            bookmarkState[id] = false;
+            S.showToast('已取消收藏');
+          } else {
+            await S.api.post('/bookmarks', { article_id: id, title, source });
+            bookmarkState[id] = true;
+            S.showToast('已收藏');
+          }
+          renderArticles();
+          await nextTick();
+          bindBookmarkBtns();
+        } catch { S.showToast('操作失败'); }
+      }
+
+      function selectCategory(cat) {
+        currentCategory.value = cat;
+        currentPage.value = 1;
+        articles.value = [];
+        loadArticles();
+      }
+
+      function loadMore() {
+        currentPage.value++;
+        loadArticles(true);
+      }
+
+      window._recordRead = function(id, title, source) {
+        S.recordRead({ id, title, source });
+      };
+
+      onMounted(() => {
+        S.initTheme();
+        S.initAuth();
+
+        // Parse URL search
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('q')) {
+          searchQuery.value = params.get('q');
+          isSearchMode.value = true;
         }
-      } catch { S.showToast('操作失败'); }
-    }
 
-    // ─── Category select ──────────────────────────────────────────────────
-
-    function selectCategory(cat) {
-      currentCategory = cat;
-      currentPage = 1;
-      articleList.innerHTML = '';
-      categoryTabsWrap.querySelectorAll('.category-tab').forEach(b => {
-        b.classList.toggle('active', b.dataset.category === cat);
+        loadCategories();
+        loadArticles();
       });
-      loadArticles();
+
+      return {
+        S, articles, loading, currentPage, totalPages, currentCategory, currentLang,
+        isSearchMode, searchQuery, headerSearch, searchVisible, categories, bookmarkState,
+        stats, renderedArticles, displayedCount, hasMore, displayedCats,
+        toggleSearch, clearHeaderSearch, doHeaderSearch, doSearch, clearSearchBar,
+        selectCategory, loadMore, loadArticles,
+      };
     }
-
-    // ─── Load more ────────────────────────────────────────────────────────
-
-    function loadMore() {
-      currentPage++;
-      loadArticles(true);
-    }
-
-    // ─── Global read recorder (called from article links) ─────────────────
-
-    window._recordRead = function(id, title, source) {
-      S.recordRead({ id, title, source });
-    };
-
-    // ─── Start ────────────────────────────────────────────────────────────
-
-    init();
-
-  })();
+  }).mount('#app');
   </script>
+  <script src="js/store.js"></script>
+  <script src="js/common.js"></script>
 </body>
 </html>

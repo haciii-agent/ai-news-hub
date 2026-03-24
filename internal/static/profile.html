@@ -8,333 +8,240 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 <body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="header-logo">
+          <span class="logo-icon">📰</span>
+          <span>AI News <span class="logo-text-accent">Hub</span></span>
+        </a>
+        <span class="header-clock"></span>
+      </div>
+      <div class="header-right">
+        <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
+        <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+        <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
+        <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+        <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+        <button class="theme-toggle" @click="toggleTheme">{{ store.theme === 'dark' ? '☀️' : '🌙' }}</button>
+        <div class="nav-user-area" id="navUserArea"></div>
+      </div>
+    </header>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="/" class="header-logo">
-        <span class="logo-icon">📰</span>
-        <span>AI News <span class="logo-text-accent">Hub</span></span>
-      </a>
+    <!-- Page Title Bar -->
+    <div class="page-title-bar">
+      <h1 class="page-title">👤 个人中心</h1>
     </div>
-    <div class="header-right">
-      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
-      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
-      <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
-      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-      <div id="navUserArea" class="nav-user-area"></div>
-      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
-    </div>
-  </header>
 
-  <!-- Page Title -->
-  <div class="page-title-bar">
-    <h1 class="page-title">👤 个人中心</h1>
-  </div>
-
-  <!-- Profile Layout -->
-  <div class="profile-layout">
-    <aside class="profile-sidebar">
-      <a href="#" class="active" data-section="info" onclick="switchSection('info', this)">个人信息</a>
-      <a href="#" data-section="prefs" onclick="switchSection('prefs', this)">偏好设置</a>
-      <a href="#" data-section="security" onclick="switchSection('security', this)">安全设置</a>
-    </aside>
-
-    <div class="profile-content">
-      <!-- Info Section -->
-      <div id="section-info" class="profile-section">
-        <div class="section-header">
-          <h2>个人信息</h2>
-          <button class="btn-secondary" id="editInfoBtn" onclick="toggleEditInfo()">编辑</button>
-        </div>
-        <div class="info-rows" id="infoDisplay">
-          <!-- Rendered by JS -->
-        </div>
-        <div id="infoEdit" style="display:none">
-          <div class="form-group">
-            <label for="editUsername">用户名</label>
-            <input type="text" id="editUsername" placeholder="新用户名" maxlength="20">
-            <div id="editUsernameHint" class="form-hint"></div>
+    <!-- Profile Content -->
+    <main class="main-content profile-content" v-if="!loading">
+      <!-- Basic Info Card -->
+      <div class="profile-card" v-if="profile">
+        <div class="profile-header">
+          <div class="profile-avatar">{{ (profile.username || '?')[0].toUpperCase() }}</div>
+          <div class="profile-info">
+            <div class="profile-username">{{ profile.username || '匿名用户' }}</div>
+            <div class="profile-email">{{ profile.email || '—' }}</div>
+            <div class="profile-role">
+              <span class="role-badge" :class="'role-' + (profile.role || 'anonymous')">
+                {{ roleLabel(profile.role) }}
+              </span>
+            </div>
           </div>
-          <div class="form-actions">
-            <button class="btn-primary" onclick="saveUsername()">保存</button>
-            <button class="btn-secondary" onclick="toggleEditInfo()">取消</button>
+        </div>
+        <div class="profile-stats">
+          <div class="profile-stat-item">
+            <span class="profile-stat-value">{{ profile.total_bookmarks || 0 }}</span>
+            <span class="profile-stat-label">收藏</span>
           </div>
-          <div id="infoSaveMsg" class="form-hint" style="display:none"></div>
+          <div class="profile-stat-item">
+            <span class="profile-stat-value">{{ profile.total_reads || 0 }}</span>
+            <span class="profile-stat-label">阅读</span>
+          </div>
+          <div class="profile-stat-item" v-if="streak">
+            <span class="profile-stat-value">{{ streak.current_streak || 0 }}</span>
+            <span class="profile-stat-label">连续天数</span>
+          </div>
+        </div>
+        <div class="profile-dates">
+          <div class="profile-date-item">
+            <span class="profile-date-label">注册时间</span>
+            <span class="profile-date-value">{{ formatDate(profile.created_at) }}</span>
+          </div>
+          <div class="profile-date-item">
+            <span class="profile-date-label">最后活跃</span>
+            <span class="profile-date-value">{{ formatDate(profile.last_seen_at) }}</span>
+          </div>
         </div>
       </div>
 
-      <!-- Prefs Section -->
-      <div id="section-prefs" class="profile-section" style="display:none">
-        <div class="section-header">
-          <h2>偏好设置</h2>
+      <!-- Interests Card -->
+      <div class="profile-card" v-if="profile && profile.profile">
+        <div class="profile-card-title">🏷️ 兴趣标签</div>
+        <div class="profile-tags" v-if="interestTags.length">
+          <span v-for="tag in interestTags" :key="tag.name" class="profile-tag">
+            {{ tag.name }} <span class="tag-weight">{{ (tag.weight * 100).toFixed(0) }}%</span>
+          </span>
         </div>
-        <div id="interestsArea">
-          <h3>兴趣画像</h3>
-          <div id="interestsCloud" class="tag-cloud"></div>
-        </div>
-        <div id="categoriesArea">
-          <h3>偏好分类</h3>
-          <div id="categoryList" class="checkbox-list"></div>
-          <div class="form-actions" style="margin-top:1rem">
-            <button class="btn-primary" onclick="savePreferences()">保存偏好</button>
-          </div>
-          <div id="prefsSaveMsg" class="form-hint" style="display:none"></div>
+        <div v-else class="profile-empty">暂无兴趣数据</div>
+      </div>
+
+      <!-- Preferred Categories Card -->
+      <div class="profile-card" v-if="profile && profile.profile && profile.profile.preferred_categories && profile.profile.preferred_categories.length">
+        <div class="profile-card-title">📂 偏好分类</div>
+        <div class="profile-tags">
+          <span v-for="cat in profile.profile.preferred_categories" :key="cat" class="profile-tag category-tag">{{ cat }}</span>
         </div>
       </div>
 
-      <!-- Security Section -->
-      <div id="section-security" class="profile-section" style="display:none">
-        <div class="section-header">
-          <h2>安全设置</h2>
+      <!-- Reading Streak Card -->
+      <div class="profile-card" v-if="streak">
+        <div class="profile-card-title">🔥 阅读连续打卡</div>
+        <div class="streak-info">
+          <div class="streak-current">
+            <span class="streak-number">{{ streak.current_streak || 0 }}</span>
+            <span class="streak-unit">天</span>
+          </div>
+          <div class="streak-detail">
+            <div>最长连续：<strong>{{ streak.longest_streak || 0 }} 天</strong></div>
+            <div>总阅读天数：<strong>{{ streak.total_days || 0 }} 天</strong></div>
+          </div>
         </div>
-        <form onsubmit="handlePasswordChange(event)">
+      </div>
+
+      <!-- Change Password Card -->
+      <div class="profile-card">
+        <div class="profile-card-title">🔐 修改密码</div>
+        <form class="password-form" @submit.prevent="handleChangePwd">
           <div class="form-group">
-            <label for="oldPassword">当前密码</label>
-            <input type="password" id="oldPassword" required autocomplete="current-password" placeholder="输入当前密码">
+            <label>旧密码</label>
+            <input type="password" v-model="oldPwd" required placeholder="输入旧密码" autocomplete="current-password">
           </div>
           <div class="form-group">
-            <label for="newPassword">新密码</label>
-            <input type="password" id="newPassword" required autocomplete="new-password" placeholder="至少8位，含大小写字母和数字" minlength="8">
+            <label>新密码</label>
+            <input type="password" v-model="newPwd" required placeholder="至少8位，含大小写字母和数字" minlength="8" autocomplete="new-password">
           </div>
           <div class="form-group">
-            <label for="confirmNewPassword">确认新密码</label>
-            <input type="password" id="confirmNewPassword" required autocomplete="new-password" placeholder="再次输入新密码">
+            <label>确认新密码</label>
+            <input type="password" v-model="newPwd2" required placeholder="再次输入新密码" autocomplete="new-password">
           </div>
-          <div id="pwdError" class="form-hint error" style="display:none"></div>
-          <div id="pwdSuccess" class="form-hint success" style="display:none"></div>
-          <button type="submit" class="btn-primary">修改密码</button>
+          <div v-if="pwdError" class="form-hint error">{{ pwdError }}</div>
+          <div v-if="pwdSuccess" class="form-hint success">{{ pwdSuccess }}</div>
+          <button type="submit" class="btn-primary" :disabled="changingPwd">
+            {{ changingPwd ? '修改中...' : '确认修改' }}
+          </button>
         </form>
-        <div style="margin-top:2rem; padding:1rem; border-radius:var(--radius-sm); background:var(--info-bg); color:var(--text-secondary);">
-          <p>🔒 最近登录记录</p>
-          <p style="margin-top:0.5rem; font-size:0.9rem;">即将推出，敬请期待</p>
-        </div>
       </div>
-    </div>
+
+      <!-- Logout -->
+      <div class="profile-card">
+        <button class="btn-danger" @click="handleLogout">🚪 退出登录</button>
+      </div>
+    </main>
+
+    <!-- Loading -->
+    <div class="loading-spinner" v-if="loading"><span>加载中...</span></div>
+
+    <!-- Footer -->
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
   </div>
 
+  <div id="toast"></div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="js/store.js"></script>
   <script>
-  (function() {
-    'use strict';
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
+  createApp({
+    setup() {
+      const S = window.aiNewsHub;
+      const store = S.store;
 
-    var API_BASE = '/api/v1';
-    var profileData = null;
-    var allCategories = ['AI/机器学习', '技术', '商业', '开源', '研究', '政策', '产品', '综合'];
+      const loading = ref(true);
+      const profile = ref(null);
+      const streak = ref(null);
+      const oldPwd = ref('');
+      const newPwd = ref('');
+      const newPwd2 = ref('');
+      const pwdError = ref('');
+      const pwdSuccess = ref('');
+      const changingPwd = ref(false);
 
-    // --- Theme ---
-    (function() {
-      var saved = localStorage.getItem('theme');
-      if (saved) document.documentElement.setAttribute('data-theme', saved);
-      var btn = document.getElementById('themeToggle');
-      if (btn) {
-        function updateIcon() { btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙'; }
-        updateIcon();
-        btn.addEventListener('click', function() {
-          var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-          document.documentElement.setAttribute('data-theme', next);
-          localStorage.setItem('theme', next);
-          updateIcon();
-        });
-      }
-    })();
+      const interestTags = computed(() => {
+        if (!profile.value || !profile.value.profile || !profile.value.profile.interests) return [];
+        return Object.entries(profile.value.profile.interests)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .map(([name, weight]) => ({ name, weight }));
+      });
 
-    // --- Helpers ---
-    function escapeHtml(str) {
-      if (!str) return '';
-      var d = document.createElement('div'); d.textContent = str; return d.innerHTML;
-    }
-
-    function formatTime(dateStr) {
-      if (!dateStr) return '—';
-      try { return new Date(dateStr).toLocaleString('zh-CN'); } catch(e) { return dateStr; }
-    }
-
-    function roleLabel(role) {
-      var map = { admin: '管理员', editor: '编辑', viewer: '用户', anonymous: '匿名' };
-      return map[role] || role;
-    }
-
-    // --- Section switch ---
-    window.switchSection = function(section, el) {
-      document.querySelectorAll('.profile-section').forEach(function(s) { s.style.display = 'none'; });
-      document.getElementById('section-' + section).style.display = '';
-      document.querySelectorAll('.profile-sidebar a').forEach(function(a) { a.classList.remove('active'); });
-      if (el) el.classList.add('active');
-    };
-
-    // --- Load profile ---
-    async function loadProfile() {
-      try {
-        var res = await fetch(API_BASE + '/user/profile', { headers: Auth.authHeaders() });
-        profileData = await res.json();
-        renderInfo();
-        renderPrefs();
-      } catch(e) {
-        console.error('Failed to load profile:', e);
-      }
-    }
-
-    function renderInfo() {
-      var user = Auth.getCurrentUser();
-      if (!user) return;
-      var html = ''
-        + '<div class="info-row"><span class="info-label">用户名</span><span>' + escapeHtml(user.username || '—') + '</span></div>'
-        + '<div class="info-row"><span class="info-label">邮箱</span><span>' + escapeHtml(user.email || '—') + '</span></div>'
-        + '<div class="info-row"><span class="info-label">角色</span><span><span class="role-badge ' + (user.role || '') + '">' + roleLabel(user.role) + '</span></span></div>'
-        + '<div class="info-row"><span class="info-label">注册时间</span><span>' + formatTime(user.created_at) + '</span></div>'
-        + '<div class="info-row"><span class="info-label">最后活跃</span><span>' + formatTime(user.last_seen_at) + '</span></div>';
-      document.getElementById('infoDisplay').innerHTML = html;
-    }
-
-    function renderPrefs() {
-      // Interests
-      var interests = [];
-      try { interests = JSON.parse(profileData.interests || '[]'); } catch(e) {}
-      var cloudEl = document.getElementById('interestsCloud');
-      if (interests.length === 0) {
-        cloudEl.innerHTML = '<span style="color:var(--text-muted)">暂无兴趣数据，浏览更多新闻后将自动生成</span>';
-      } else {
-        cloudEl.innerHTML = interests.map(function(t) {
-          return '<span class="tag-item">' + escapeHtml(t) + '</span>';
-        }).join('');
+      function roleLabel(role) {
+        const map = { admin: '管理员', editor: '编辑', viewer: '普通用户', anonymous: '匿名' };
+        return map[role] || role;
       }
 
-      // Categories
-      var prefs = [];
-      try { prefs = JSON.parse(profileData.preferred_categories || '[]'); } catch(e) {}
-      var listEl = document.getElementById('categoryList');
-      listEl.innerHTML = allCategories.map(function(cat) {
-        var checked = prefs.indexOf(cat) !== -1 ? ' checked' : '';
-        return '<label class="checkbox-item"><input type="checkbox" value="' + escapeHtml(cat) + '"' + checked + '> ' + escapeHtml(cat) + '</label>';
-      }).join('');
-    }
-
-    // --- Edit username ---
-    var editUsernameTimer = null;
-    window.toggleEditInfo = function() {
-      var display = document.getElementById('infoDisplay');
-      var edit = document.getElementById('infoEdit');
-      var btn = document.getElementById('editInfoBtn');
-      if (edit.style.display === 'none') {
-        edit.style.display = '';
-        display.style.display = 'none';
-        btn.style.display = 'none';
-        document.getElementById('editUsername').value = Auth.getCurrentUser().username || '';
-      } else {
-        edit.style.display = 'none';
-        display.style.display = '';
-        btn.style.display = '';
+      function formatDate(d) {
+        if (!d) return '—';
+        return new Date(d).toLocaleString('zh-CN');
       }
-    };
 
-    document.getElementById('editUsername').addEventListener('input', function() {
-      clearTimeout(editUsernameTimer);
-      var val = this.value.trim();
-      var hint = document.getElementById('editUsernameHint');
-      if (!val) { hint.textContent = ''; hint.className = 'form-hint'; return; }
-      if (!/^[\w\u4e00-\u9fff]{3,20}$/.test(val)) {
-        hint.textContent = '3-20字符，仅字母/数字/下划线/中文';
-        hint.className = 'form-hint error';
-        return;
-      }
-      hint.textContent = '检查中...';
-      hint.className = 'form-hint';
-      editUsernameTimer = setTimeout(function() {
-        Auth.checkUsername(val).then(function(data) {
-          if (data.available) {
-            hint.textContent = '✓ 可用';
-            hint.className = 'form-hint success';
-          } else {
-            hint.textContent = '✗ 已被占用';
-            hint.className = 'form-hint error';
+      async function handleChangePwd() {
+        pwdError.value = '';
+        pwdSuccess.value = '';
+        if (newPwd.value.length < 8 || !/[a-z]/.test(newPwd.value) || !/[A-Z]/.test(newPwd.value) || !/\d/.test(newPwd.value)) {
+          pwdError.value = '新密码至少8位，需含大小写字母和数字'; return;
+        }
+        if (newPwd.value !== newPwd2.value) { pwdError.value = '两次密码不一致'; return; }
+        changingPwd.value = true;
+        try {
+          const data = await S.apiFetch('/user/password', {
+            method: 'PUT',
+            body: JSON.stringify({ old_password: oldPwd.value, new_password: newPwd.value }),
+          });
+          if (data.error) { pwdError.value = data.message || '修改失败'; }
+          else {
+            pwdSuccess.value = '密码修改成功';
+            oldPwd.value = ''; newPwd.value = ''; newPwd2.value = '';
           }
-        }).catch(function() { hint.textContent = ''; });
-      }, 500);
-    });
+        } catch(e) { pwdError.value = '请求失败'; }
+        finally { changingPwd.value = false; }
+      }
 
-    window.saveUsername = async function() {
-      var username = document.getElementById('editUsername').value.trim();
-      var msg = document.getElementById('infoSaveMsg');
-      if (!/^[\w\u4e00-\u9fff]{3,20}$/.test(username)) {
-        msg.textContent = '用户名格式不正确'; msg.className = 'form-hint error'; msg.style.display = ''; return;
+      async function handleLogout() {
+        await S.logout();
+        location.href = '/';
       }
-      try {
-        var res = await fetch(API_BASE + '/user/profile', {
-          method: 'PUT',
-          headers: Auth.authHeaders(),
-          body: JSON.stringify({ username: username })
-        });
-        var data = await res.json();
-        if (data.error) throw new Error(data.message);
-        var user = Auth.getCurrentUser();
-        if (user) user.username = username;
-        Auth.updateNavUI();
-        toggleEditInfo();
-        renderInfo();
-      } catch(e) {
-        msg.textContent = e.message; msg.className = 'form-hint error'; msg.style.display = '';
-      }
-    };
 
-    // --- Save preferences ---
-    window.savePreferences = async function() {
-      var msg = document.getElementById('prefsSaveMsg');
-      var checks = document.querySelectorAll('#categoryList input:checked');
-      var cats = [];
-      checks.forEach(function(c) { cats.push(c.value); });
-      try {
-        var res = await fetch(API_BASE + '/user/profile', {
-          method: 'PUT',
-          headers: Auth.authHeaders(),
-          body: JSON.stringify({ preferred_categories: cats })
-        });
-        var data = await res.json();
-        if (data.error) throw new Error(data.message);
-        msg.textContent = '✓ 偏好已保存'; msg.className = 'form-hint success'; msg.style.display = '';
-        setTimeout(function() { msg.style.display = 'none'; }, 3000);
-      } catch(e) {
-        msg.textContent = e.message; msg.className = 'form-hint error'; msg.style.display = '';
-      }
-    };
+      function toggleTheme() { S.toggleTheme(); }
 
-    // --- Password change ---
-    window.handlePasswordChange = async function(e) {
-      e.preventDefault();
-      var errEl = document.getElementById('pwdError');
-      var sucEl = document.getElementById('pwdSuccess');
-      errEl.style.display = 'none'; sucEl.style.display = 'none';
-      var oldPwd = document.getElementById('oldPassword').value;
-      var newPwd = document.getElementById('newPassword').value;
-      var confirmPwd = document.getElementById('confirmNewPassword').value;
-      if (newPwd !== confirmPwd) {
-        errEl.textContent = '两次密码不一致'; errEl.style.display = ''; return;
-      }
-      if (newPwd.length < 8 || !/[a-z]/.test(newPwd) || !/[A-Z]/.test(newPwd) || !/\d/.test(newPwd)) {
-        errEl.textContent = '密码至少8位，需含大小写字母和数字'; errEl.style.display = ''; return;
-      }
-      try {
-        await Auth.updatePassword(oldPwd, newPwd);
-        sucEl.textContent = '✓ 密码修改成功'; sucEl.style.display = '';
-        document.getElementById('oldPassword').value = '';
-        document.getElementById('newPassword').value = '';
-        document.getElementById('confirmNewPassword').value = '';
-      } catch(e) {
-        errEl.textContent = e.message; errEl.style.display = '';
-      }
-    };
+      onMounted(async () => {
+        S.initTheme();
+        await S.initAuth();
+        if (!S.isLoggedIn()) {
+          localStorage.setItem('login_redirect', '/profile.html');
+          location.href = '/login.html';
+          return;
+        }
+        try {
+          const [profileData, streakData] = await Promise.all([
+            S.apiFetch('/user/profile'),
+            S.apiFetch('/user/streak').catch(() => null),
+          ]);
+          profile.value = profileData.user || profileData;
+          streak.value = streakData;
+        } catch(e) {}
+        loading.value = false;
+        S.updateNavUI();
+      });
 
-    // --- Init ---
-    Auth.init().then(function() {
-      if (!Auth.isLoggedIn()) {
-        localStorage.setItem('login_redirect', '/profile.html');
-        window.location.href = '/login.html';
-        return;
-      }
-      loadProfile();
-    });
-  })();
+      return {
+        store, loading, profile, streak, interestTags,
+        oldPwd, newPwd, newPwd2, pwdError, pwdSuccess, changingPwd,
+        roleLabel, formatDate, handleChangePwd, handleLogout, toggleTheme,
+      };
+    }
+  }).mount('#app');
   </script>
 </body>
 </html>

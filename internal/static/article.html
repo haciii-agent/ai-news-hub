@@ -8,645 +8,334 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 <body>
-
-  <!-- Toast -->
-  <div class="toast" id="toast"></div>
-
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="/" class="header-logo">
-        <span class="logo-icon">📰</span>
-        <span>AI News <span class="logo-text-accent">Hub</span></span>
-      </a>
-    </div>
-    <div class="header-right">
-      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
-      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
-      <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
-      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-      <a href="/?search=" class="search-link-detail" id="searchLink" title="搜索新闻">🔍</a>
-      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
-      <div id="navUserArea" class="nav-user-area"></div>
-    </div>
-  </header>
-
-  <!-- Article Detail -->
-  <main class="article-detail">
-    <button class="detail-back" onclick="history.back()">← 返回列表</button>
-
-    <div id="detailContent">
-      <div class="loading-wrap">
-        <div class="spinner"></div>
-        <p>加载中…</p>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="header-logo">
+          <span class="logo-icon">📰</span>
+          <span>AI News <span class="logo-text-accent">Hub</span></span>
+        </a>
       </div>
-    </div>
-  </main>
+      <div class="header-right">
+        <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
+        <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+        <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
+        <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+        <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+        <button class="theme-toggle" @click="S.toggleTheme()">
+          {{ S.store.theme === 'dark' ? '☀️' : '🌙' }}
+        </button>
+        <div class="nav-user-area" id="navUserArea"></div>
+      </div>
+    </header>
 
-  <div class="footer-copyright">AI News Hub v1.2.0 · 用心搭建 ⚡</div>
+    <!-- Main -->
+    <main class="article-detail">
+      <button class="detail-back" @click="$router ? $router.back() : history.back()">← 返回列表</button>
 
+      <!-- Loading -->
+      <div v-if="loading" class="loading-wrap">
+        <div class="spinner"></div><p>加载中…</p>
+      </div>
+
+      <!-- Error -->
+      <div v-else-if="error" class="error-state">
+        <div class="error-icon">😔</div>
+        <p>{{ error }}</p>
+        <p class="error-retry" @click="loadArticle">点击重试</p>
+      </div>
+
+      <!-- Article Content -->
+      <div v-else-if="article" id="detailContent">
+        <div class="detail-card">
+          <h1 class="detail-title">{{ article.title }}</h1>
+          <div class="detail-meta">
+            <span class="detail-source">📌 {{ article.source }}</span>
+            <span class="card-dot">·</span>
+            <span class="detail-time">🕐 {{ formatTime(article.published_at || article.collected_at) }}</span>
+            <span class="card-lang" :class="article.language === 'zh' ? '' : 'en'">
+              {{ article.language === 'zh' ? '🇨🇳 中文' : '🇬🇧 EN' }}
+            </span>
+            <span class="tag" :class="getCatClass(article.category)">{{ article.category || '未分类' }}</span>
+            <span v-if="article.importance_score > 0" class="detail-score-badge">
+              {{ article.importance_score >= 80 ? '🔥' : article.importance_score >= 60 ? '⚡' : '📌' }}
+              重要度 {{ Math.round(article.importance_score) }}/100
+            </span>
+          </div>
+
+          <!-- Hero Image -->
+          <img v-if="article.image_url" class="detail-hero-image" :src="article.image_url" :alt="article.title" loading="lazy" @error="e => e.target.style.display = 'none'">
+
+          <!-- AI Summary -->
+          <div v-if="article.ai_summary" class="detail-ai-summary">
+            <div class="detail-ai-summary-header"><span class="detail-ai-icon">🤖</span> AI 智能摘要</div>
+            <div class="detail-ai-summary-body">{{ article.ai_summary }}</div>
+          </div>
+
+          <!-- Original Summary -->
+          <details v-if="article.ai_summary && article.summary && article.summary !== article.ai_summary" class="detail-orig-summary">
+            <summary>📄 原始摘要</summary>
+            <div class="detail-orig-summary-body">{{ article.summary }}</div>
+          </details>
+          <div v-else-if="article.summary" class="detail-summary">{{ article.summary }}</div>
+
+          <!-- Content -->
+          <div v-if="article.content_html" class="detail-content" v-html="article.content_html"></div>
+
+          <!-- Interaction Bar -->
+          <div class="interaction-bar">
+            <span class="interaction-stat">❤️ <span class="stat-num">{{ interactions.likes_count }}</span> 人点赞</span>
+            <span class="interaction-stat">💬 <span class="stat-num">{{ commentsData.total || 0 }}</span> 条评论</span>
+            <button class="like-btn" :class="{ liked: interactions.is_liked }" @click="toggleLike">
+              <span>{{ interactions.is_liked ? '❤️' : '🤍' }}</span>
+              <span>{{ interactions.is_liked ? '已赞' : '点赞' }}</span>
+            </button>
+            <div class="share-buttons">
+              <button class="share-btn share-copy" @click="copyLink" title="复制链接">📋</button>
+              <a class="share-btn" :href="'https://twitter.com/intent/tweet?text=' + encodeURIComponent(article.title) + '&url=' + encodeURIComponent(pageUrl)" target="_blank" rel="noopener" title="分享到 Twitter">🐦</a>
+              <a class="share-btn" :href="'https://service.weibo.com/share/share.php?title=' + encodeURIComponent(article.title) + '&url=' + encodeURIComponent(pageUrl)" target="_blank" rel="noopener" title="分享到微博">📢</a>
+            </div>
+          </div>
+
+          <!-- Comments Section -->
+          <div class="comments-section">
+            <div class="comments-header">💬 评论区</div>
+            <div class="comment-form">
+              <input type="text" class="comment-input" v-model="commentText" @keydown.enter.exact.prevent="submitComment" placeholder="发表评论..." maxlength="500">
+              <button class="comment-submit-btn" @click="submitComment" :disabled="submitting">{{ submitting ? '发表中...' : '发表' }}</button>
+            </div>
+            <div v-if="commentsData.comments && commentsData.comments.length === 0" class="comments-empty">
+              <div class="empty-icon">💬</div><p>暂无评论，来发表第一条吧</p>
+            </div>
+            <div v-else class="comments-list">
+              <div v-for="c in commentsData.comments" :key="c.id" class="comment-item" :data-comment-id="c.id">
+                <div class="comment-avatar">👤</div>
+                <div class="comment-body">
+                  <div class="comment-meta">
+                    <span class="comment-author">匿名用户</span>
+                    <span class="comment-time">{{ formatTime(c.created_at) }}</span>
+                    <button v-if="c.user_id === currentUserId" class="comment-delete-btn" @click="deleteComment(c.id)">删除</button>
+                  </div>
+                  <div class="comment-text">{{ c.content }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="detail-actions">
+            <button class="detail-cta detail-cta-primary" @click="togglePreview">
+              {{ previewOpen ? '收起正文' : '📖 查看正文' }}
+            </button>
+            <a class="detail-cta detail-cta-secondary" :href="article.url" target="_blank" rel="noopener">🔗 原文链接</a>
+            <button class="detail-cta detail-cta-bookmark" :class="{ bookmarked: article.is_bookmarked }" @click="toggleBookmark">
+              <span>{{ article.is_bookmarked ? '❤️' : '🤍' }}</span>
+              <span>{{ article.is_bookmarked ? '已收藏' : '收藏' }}</span>
+            </button>
+          </div>
+
+          <!-- Content Preview -->
+          <div class="content-preview" v-show="previewOpen" ref="previewSection">
+            <div class="content-preview-header">
+              <span>📖 正文预览</span>
+              <span class="content-preview-source" v-if="previewData">来源: {{ sourceDomain }}</span>
+            </div>
+            <div class="content-preview-body" id="previewBody">
+              <div v-if="previewLoading" class="loading-wrap" style="padding:40px 0;">
+                <div class="spinner"></div><p>正在提取正文…</p>
+              </div>
+              <div v-else-if="previewData && previewData.html" v-html="previewData.html"></div>
+              <div v-else-if="previewData" class="content-preview-error">未能提取到正文内容，请直接访问原文</div>
+            </div>
+            <div class="content-preview-footer">⚠️ 此内容由 AI 自动提取，如有错漏请以原文为准</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="js/store.js"></script>
   <script>
-    Auth.init();
-    (function () {
-      const API_BASE = '/api/v1';
-      const detailEl = document.getElementById('detailContent');
-      let currentUserID = 0;
-      let currentArticleID = null;
-      let currentArticleURL = '';
+  const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
 
-      // --- Toast ---
-      function showToast(msg) {
-        var t = document.getElementById('toast');
-        t.textContent = msg;
-        t.classList.add('show');
-        setTimeout(function() { t.classList.remove('show'); }, 2000);
-      }
-
-      // --- User Token Management ---
-      function getUserToken() {
-        let token = localStorage.getItem('user_token');
-        if (!token) {
-          token = crypto.randomUUID();
-          localStorage.setItem('user_token', token);
-        }
-        return token;
-      }
-
-      function authHeaders() {
-        return typeof Auth !== "undefined" ? Auth.authHeaders() : {
-          "Content-Type": "application/json",
-          "X-User-Token": getUserToken(),
-        };
-      }
-
-      // Parse article ID from URL: /article.html?id=123
-      const params = new URLSearchParams(window.location.search);
+  createApp({
+    setup() {
+      const S = window.aiNewsHub;
+      const params = new URLSearchParams(location.search);
       const articleId = params.get('id');
 
-      if (!articleId) {
-        detailEl.innerHTML = '<div class="error-state"><div class="error-icon">🤷</div><p>缺少文章 ID</p></div>';
-        return;
-      }
+      const article = ref(null);
+      const interactions = reactive({ likes_count: 0, comments_count: 0, is_liked: false });
+      const commentsData = reactive({ comments: [], total: 0 });
+      const loading = ref(true);
+      const error = ref('');
+      const currentUserId = ref(0);
+      const commentText = ref('');
+      const submitting = ref(false);
+      const previewOpen = ref(false);
+      const previewLoading = ref(false);
+      const previewData = ref(null);
+      const pageUrl = ref(location.href);
 
-      currentArticleID = parseInt(articleId);
-
-      // Update page title
-      document.title = '加载中… — AI News Hub';
-
-      // Record read history (fire and forget)
-      fetch(API_BASE + '/history', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ article_id: currentArticleID }),
-      }).catch(function() {});
-
-      // Load article detail + interactions in parallel
-      Promise.all([
-        fetch(API_BASE + '/articles/' + encodeURIComponent(articleId), {
-          headers: { 'X-User-Token': getUserToken() },
-        }).then(function(res) { return res.json(); }),
-        fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/interactions', {
-          headers: { 'X-User-Token': getUserToken() },
-        }).then(function(res) { return res.json(); }),
-        fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/comments?page=1&per_page=50', {
-          headers: { 'X-User-Token': getUserToken() },
-        }).then(function(res) { return res.json(); }),
-      ]).then(function(results) {
-        var data = results[0];
-        var interactions = results[1];
-        var commentsData = results[2];
-
-        if (data.error) {
-          detailEl.innerHTML = '<div class="error-state"><div class="error-icon">😔</div><p>' + escapeHtml(data.message || '加载失败') + '</p></div>';
-          return;
-        }
-
-        var a = data;
-        currentArticleURL = a.url;
-        document.title = a.title + ' — AI News Hub';
-
-        var catClass = 'tag-' + (a.category ? slugify(a.category) : 'unknown');
-        var langClass = a.language === 'zh' ? 'zh' : 'en';
-        var langLabel = a.language === 'zh' ? '🇨🇳 中文' : '🇬🇧 EN';
-        var timeStr = formatTime(a.published_at || a.collected_at);
-        var isBookmarked = !!a.is_bookmarked;
-        var bookmarkIcon = isBookmarked ? '❤️' : '🤍';
-        var bookmarkText = isBookmarked ? '已收藏' : '收藏';
-
-        // Interaction data
-        var likesCount = interactions.likes_count || 0;
-        var commentsCount = interactions.comments_count || 0;
-        var isLiked = !!interactions.is_liked;
-        var likeIcon = isLiked ? '❤️' : '🤍';
-        var likeClass = isLiked ? 'liked' : '';
-
-        var heroImg = '';
-        if (a.image_url) {
-          heroImg = '<img class="detail-hero-image" src="' + escapeHtml(a.image_url) + '" alt="' + escapeHtml(a.title) + '" loading="lazy" onerror="this.style.display=\'none\'">';
-        }
-
-        // AI Summary section
-        var aiSummaryHtml = '';
-        if (a.ai_summary) {
-          aiSummaryHtml = '<div class="detail-ai-summary">'
-            + '<div class="detail-ai-summary-header"><span class="detail-ai-icon">🤖</span> AI 智能摘要</div>'
-            + '<div class="detail-ai-summary-body">' + escapeHtml(a.ai_summary) + '</div>'
-            + '</div>';
-        }
-
-        // Original summary (collapsible if AI summary exists)
-        var origSummaryHtml = '';
-        if (a.summary) {
-          if (a.ai_summary && a.summary !== a.ai_summary) {
-            origSummaryHtml = '<details class="detail-orig-summary"><summary>📄 原始摘要</summary><div class="detail-orig-summary-body">' + escapeHtml(a.summary) + '</div></details>';
-          } else if (!a.ai_summary) {
-            origSummaryHtml = '<div class="detail-summary">' + escapeHtml(a.summary) + '</div>';
-          }
-        }
-
-        // Importance score badge
-        var scoreHtml = '';
-        if (a.importance_score > 0) {
-          var score = Math.round(a.importance_score);
-          var scoreIcon = score >= 80 ? '🔥' : score >= 60 ? '⚡' : '📌';
-          scoreHtml = '<span class="detail-score-badge">' + scoreIcon + ' 重要度 ' + score + '/100</span>';
-        }
-
-        var contentHtml = '';
-        if (a.content_html) {
-          contentHtml = '<div class="detail-content">' + a.content_html + '</div>';
-        }
-
-        // 来源域名
-        var sourceDomain = '';
-        try {
-          sourceDomain = new URL(a.url).hostname;
-        } catch (e) {
-          sourceDomain = a.source || '';
-        }
-
-        // Build share URLs
-        var shareTitle = encodeURIComponent(a.title);
-        var shareURL = encodeURIComponent(window.location.href);
-        var twitterShare = 'https://twitter.com/intent/tweet?text=' + shareTitle + '&url=' + shareURL;
-        var weiboShare = 'https://service.weibo.com/share/share.php?title=' + shareTitle + '&url=' + shareURL;
-
-        // Build comments HTML
-        var commentsHtml = '';
-        var comments = commentsData.comments || [];
-        if (comments.length === 0) {
-          commentsHtml = '<div class="comments-empty"><div class="empty-icon">💬</div><p>暂无评论，来发表第一条吧</p></div>';
-        } else {
-          comments.forEach(function(c) {
-            var isOwner = false;
-            try { isOwner = c.user_id === currentUserID; } catch(e) {}
-            commentsHtml += '<div class="comment-item" data-comment-id="' + c.id + '">'
-              + '<div class="comment-avatar">👤</div>'
-              + '<div class="comment-body">'
-              + '<div class="comment-meta">'
-              + '<span class="comment-author">匿名用户</span>'
-              + '<span class="comment-time">' + formatTime(c.created_at) + '</span>'
-              + (isOwner ? '<button class="comment-delete-btn" onclick="deleteComment(' + c.id + ', this)">删除</button>' : '')
-              + '</div>'
-              + '<div class="comment-text">' + escapeHtml(c.content) + '</div>'
-              + '</div>'
-              + '</div>';
-          });
-        }
-
-        detailEl.innerHTML = '<div class="detail-card">'
-          + '<h1 class="detail-title">' + escapeHtml(a.title) + '</h1>'
-          + '<div class="detail-meta">'
-          + '<span class="detail-source">📌 ' + escapeHtml(a.source) + '</span>'
-          + '<span class="card-dot">·</span>'
-          + '<span class="detail-time">🕐 ' + timeStr + '</span>'
-          + '<span class="card-lang ' + langClass + '">' + langLabel + '</span>'
-          + '<span class="tag ' + catClass + '">' + escapeHtml(a.category || '未分类') + '</span>'
-          + scoreHtml
-          + '</div>'
-          + heroImg
-          + aiSummaryHtml
-          + origSummaryHtml
-          + contentHtml
-
-          // Interaction bar
-          + '<div class="interaction-bar">'
-          + '<span class="interaction-stat"><span class="like-icon">❤️</span> <span class="stat-num" id="likesCountDisplay">' + likesCount + '</span> 人点赞</span>'
-          + '<span class="interaction-stat">💬 <span class="stat-num" id="commentsCountDisplay">' + commentsCount + '</span> 条评论</span>'
-          + '<button class="like-btn ' + likeClass + '" id="btnLike" onclick="toggleLike(this)">'
-          + '<span class="like-icon">' + likeIcon + '</span> <span class="like-text">' + (isLiked ? '已赞' : '点赞') + '</span>'
-          + '</button>'
-          + '<div class="share-buttons">'
-          + '<button class="share-btn share-copy" onclick="copyLink()" title="复制链接">📋</button>'
-          + '<a class="share-btn" href="' + twitterShare + '" target="_blank" rel="noopener" title="分享到 Twitter">🐦</a>'
-          + '<a class="share-btn" href="' + weiboShare + '" target="_blank" rel="noopener" title="分享到微博">📢</a>'
-          + '</div>'
-          + '</div>'
-
-          // Comments section
-          + '<div class="comments-section">'
-          + '<div class="comments-header">💬 评论区</div>'
-          + '<div class="comment-form">'
-          + '<input type="text" class="comment-input" id="commentInput" placeholder="发表评论..." maxlength="500">'
-          + '<button class="comment-submit-btn" id="btnSubmitComment" onclick="submitComment()">发表</button>'
-          + '</div>'
-          + '<div id="commentsList">' + commentsHtml + '</div>'
-          + '</div>'
-
-          // Action buttons
-          + '<div class="detail-actions">'
-          + '<button class="detail-cta detail-cta-primary" id="btnPreview" onclick="togglePreview()">📖 查看正文</button>'
-          + '<a class="detail-cta detail-cta-secondary" href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">🔗 原文链接</a>'
-          + '<button class="detail-cta detail-cta-bookmark" id="btnBookmark" data-bookmarked="' + isBookmarked + '" data-article-id="' + a.id + '" onclick="toggleBookmark(this)">'
-          + '<span class="bookmark-icon">' + bookmarkIcon + '</span> <span class="bookmark-text">' + bookmarkText + '</span>'
-          + '</button>'
-          + '</div>'
-          + '<div class="content-preview" id="contentPreview" style="display:none;">'
-          + '<div class="content-preview-header">'
-          + '<span>📖 正文预览</span>'
-          + '<span class="content-preview-source">来源: ' + escapeHtml(sourceDomain) + '</span>'
-          + '</div>'
-          + '<div class="content-preview-body" id="previewBody">'
-          + '<div class="loading-wrap" style="padding:40px 0;">'
-          + '<div class="spinner"></div>'
-          + '<p>正在提取正文…</p>'
-          + '</div>'
-          + '</div>'
-          + '<div class="content-preview-footer">⚠️ 此内容由 AI 自动提取，如有错漏请以原文为准</div>'
-          + '</div>'
-          + '</div>';
-
-        // Store article URL for preview
-        window._articleUrl = a.url;
-        window._previewLoaded = false;
-        window._previewOpen = false;
-
-        // Enter key to submit comment
-        document.getElementById('commentInput').addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            submitComment();
-          }
-        });
-
-        // Get user ID for comment ownership
-        fetch(API_BASE + '/user/init', {
-          method: 'POST',
-          headers: authHeaders(),
-        }).then(function(res) { return res.json(); }).then(function(data) {
-          if (!data.error && data.user_id) {
-            currentUserID = data.user_id;
-            // Re-render comments with delete buttons
-            refreshComments();
-          }
-        }).catch(function() {});
-      })
-      .catch(function(err) {
-        detailEl.innerHTML = '<div class="error-state"><div class="error-icon">🔌</div><p>网络错误，请重试</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
-        console.error('Article fetch error:', err);
+      const sourceDomain = computed(() => {
+        if (!article.value || !article.value.url) return '';
+        try { return new URL(article.value.url).hostname; } catch { return ''; }
       });
 
-      // --- Refresh comments ---
-      function refreshComments() {
-        fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/comments?page=1&per_page=50')
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            var listEl = document.getElementById('commentsList');
-            if (!listEl) return;
-
-            var comments = data.comments || [];
-            var html = '';
-            if (comments.length === 0) {
-              html = '<div class="comments-empty"><div class="empty-icon">💬</div><p>暂无评论，来发表第一条吧</p></div>';
-            } else {
-              comments.forEach(function(c) {
-                var isOwner = (c.user_id === currentUserID);
-                html += '<div class="comment-item" data-comment-id="' + c.id + '">'
-                  + '<div class="comment-avatar">👤</div>'
-                  + '<div class="comment-body">'
-                  + '<div class="comment-meta">'
-                  + '<span class="comment-author">匿名用户</span>'
-                  + '<span class="comment-time">' + formatTime(c.created_at) + '</span>'
-                  + (isOwner ? '<button class="comment-delete-btn" onclick="deleteComment(' + c.id + ', this)">删除</button>' : '')
-                  + '</div>'
-                  + '<div class="comment-text">' + escapeHtml(c.content) + '</div>'
-                  + '</div>'
-                  + '</div>';
-              });
-            }
-            listEl.innerHTML = html;
-
-            // Update comment count display
-            var countEl = document.getElementById('commentsCountDisplay');
-            if (countEl) countEl.textContent = data.total || 0;
-          })
-          .catch(function() {});
-      }
-
-      // --- Submit Comment (global for onclick) ---
-      window.submitComment = function() {
-        var input = document.getElementById('commentInput');
-        var btn = document.getElementById('btnSubmitComment');
-        if (!input || !btn) return;
-
-        var content = input.value.trim();
-        if (content.length < 1 || content.length > 500) {
-          showToast('评论内容长度需要在 1-500 字符之间');
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = '发表中...';
-
-        fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/comments', {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify({ content: content }),
-        }).then(function(res) { return res.json(); }).then(function(data) {
-          btn.disabled = false;
-          btn.textContent = '发表';
-
-          if (data.error) {
-            showToast(data.message || '发表失败');
-            return;
-          }
-
-          input.value = '';
-          showToast('评论成功');
-          refreshComments();
-        }).catch(function() {
-          btn.disabled = false;
-          btn.textContent = '发表';
-          showToast('网络错误');
-        });
-      };
-
-      // --- Delete Comment ---
-      window.deleteComment = function(commentId, btnEl) {
-        if (!confirm('确定要删除这条评论吗？')) return;
-
-        fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/comments/' + commentId, {
-          method: 'DELETE',
-          headers: authHeaders(),
-        }).then(function(res) { return res.json(); }).then(function(data) {
-          if (data.error) {
-            showToast(data.message || '删除失败');
-            return;
-          }
-
-          // Remove comment element
-          var item = btnEl.closest('.comment-item');
-          if (item) {
-            item.style.opacity = '0';
-            item.style.transform = 'translateX(20px)';
-            item.style.transition = 'all 0.3s';
-            setTimeout(function() { item.remove(); }, 300);
-          }
-          showToast('已删除');
-
-          // Update count
-          var countEl = document.getElementById('commentsCountDisplay');
-          if (countEl) {
-            var c = parseInt(countEl.textContent) - 1;
-            countEl.textContent = Math.max(0, c);
-          }
-        }).catch(function() {
-          showToast('网络错误');
-        });
-      };
-
-      // --- Toggle Like ---
-      window.toggleLike = function(btn) {
-        var iconEl = btn.querySelector('.like-icon');
-        var textEl = btn.querySelector('.like-text');
-        var isLiked = btn.classList.contains('liked');
-        var countEl = document.getElementById('likesCountDisplay');
-        var currentCount = parseInt(countEl ? countEl.textContent : '0');
-
-        if (isLiked) {
-          // Unlike
-          fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/like', {
-            method: 'DELETE',
-            headers: authHeaders(),
-          }).then(function(res) { return res.json(); }).then(function(data) {
-            if (!data.error) {
-              btn.classList.remove('liked');
-              iconEl.textContent = '🤍';
-              textEl.textContent = '点赞';
-              if (countEl) countEl.textContent = Math.max(0, currentCount - 1);
-            }
-          }).catch(function() {});
-        } else {
-          // Like
-          fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/like', {
-            method: 'POST',
-            headers: authHeaders(),
-          }).then(function(res) { return res.json(); }).then(function(data) {
-            if (!data.error) {
-              btn.classList.add('liked');
-              iconEl.textContent = '❤️';
-              textEl.textContent = '已赞';
-              btn.classList.add('like-pop');
-              setTimeout(function() { btn.classList.remove('like-pop'); }, 400);
-              if (countEl) countEl.textContent = currentCount + 1;
-            }
-          }).catch(function() {});
-        }
-      };
-
-      // --- Copy Link ---
-      window.copyLink = function() {
-        var url = window.location.href;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(url).then(function() {
-            showToast('链接已复制');
-          }).catch(function() {
-            fallbackCopy(url);
-          });
-        } else {
-          fallbackCopy(url);
-        }
-      };
-
-      function fallbackCopy(text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-          document.execCommand('copy');
-          showToast('链接已复制');
-        } catch(e) {
-          showToast('复制失败');
-        }
-        document.body.removeChild(ta);
-      }
-
-      // --- Toggle bookmark (global for onclick) ---
-      window.toggleBookmark = function(btn) {
-        var articleId = btn.dataset.articleId;
-        var isBookmarked = btn.dataset.bookmarked === 'true';
-        var iconEl = btn.querySelector('.bookmark-icon');
-        var textEl = btn.querySelector('.bookmark-text');
-
-        if (isBookmarked) {
-          fetch(API_BASE + '/bookmarks/' + articleId, {
-            method: 'DELETE',
-            headers: authHeaders(),
-          }).then(function(res) { return res.json(); }).then(function(data) {
-            if (!data.error) {
-              btn.dataset.bookmarked = 'false';
-              iconEl.textContent = '🤍';
-              textEl.textContent = '收藏';
-              btn.classList.remove('bookmarked');
-            }
-          }).catch(function() {});
-        } else {
-          fetch(API_BASE + '/bookmarks', {
-            method: 'POST',
-            headers: authHeaders(),
-            body: JSON.stringify({ article_id: parseInt(articleId) }),
-          }).then(function(res) { return res.json(); }).then(function(data) {
-            if (!data.error) {
-              btn.dataset.bookmarked = 'true';
-              iconEl.textContent = '❤️';
-              textEl.textContent = '已收藏';
-              btn.classList.add('bookmarked', 'bookmark-pop');
-              setTimeout(function() { btn.classList.remove('bookmark-pop'); }, 500);
-            }
-          }).catch(function() {});
-        }
-      };
-
-      // --- Toggle preview ---
-      window.togglePreview = function() {
-        var preview = document.getElementById('contentPreview');
-        var btn = document.getElementById('btnPreview');
-        if (!preview || !btn) return;
-
-        if (window._previewOpen) {
-          preview.style.display = 'none';
-          btn.textContent = '📖 查看正文';
-          btn.disabled = false;
-          window._previewOpen = false;
-          return;
-        }
-
-        window._previewOpen = true;
-        preview.style.display = 'block';
-        preview.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-        if (!window._previewLoaded) {
-          btn.disabled = true;
-          btn.innerHTML = '<span class="btn-spinner"></span> 提取中…';
-
-          fetch(API_BASE + '/articles/' + encodeURIComponent(articleId) + '/content')
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              var body = document.getElementById('previewBody');
-              if (!body) return;
-
-              if (data.error && data.html === undefined) {
-                body.innerHTML = '<div class="content-preview-error">正文提取失败，请直接访问原文</div>';
-                btn.textContent = '📖 查看正文';
-                btn.disabled = false;
-                return;
-              }
-
-              var headerEl = preview.querySelector('.content-preview-header');
-              if (headerEl) {
-                var timingInfo = '';
-                if (data.fetch_time_ms > 0) {
-                  timingInfo = ' · 耗时: ' + (data.fetch_time_ms / 1000).toFixed(1) + 's';
-                }
-                if (data.cached) {
-                  timingInfo += ' · 已缓存';
-                }
-                var existingSource = headerEl.querySelector('.content-preview-source');
-                if (existingSource) {
-                  existingSource.textContent = existingSource.textContent + timingInfo;
-                }
-              }
-
-              if (data.html && data.html.trim()) {
-                body.innerHTML = data.html;
-                window._previewLoaded = true;
-                btn.textContent = '收起正文';
-              } else {
-                body.innerHTML = '<div class="content-preview-error">未能提取到正文内容，请直接访问原文</div>';
-                btn.textContent = '📖 查看正文';
-              }
-              btn.disabled = false;
-            })
-            .catch(function(err) {
-              var body = document.getElementById('previewBody');
-              if (body) {
-                body.innerHTML = '<div class="content-preview-error">网络错误，请重试</div>';
-              }
-              btn.textContent = '📖 查看正文';
-              btn.disabled = false;
-              console.error('Content fetch error:', err);
-            });
-        } else {
-          btn.textContent = '收起正文';
-        }
-      };
-
-      // --- Utility functions ---
-      function slugify(text) {
-        return text.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-      }
-
-      function escapeHtml(str) {
-        if (!str) return '';
-        var d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
+      function getCatClass(cat) {
+        const m = S.CATEGORY_COLORS[cat] || 'tag-general';
+        return m.replace('tag-', '');
       }
 
       function formatTime(dateStr) {
         if (!dateStr) return '';
         try {
-          var d = new Date(dateStr);
-          var now = new Date();
-          var diff = now - d;
+          const d = new Date(dateStr);
+          const now = new Date();
+          const diff = now - d;
           if (diff < 60000) return '刚刚';
           if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
           if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
           if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
           return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-        } catch (e) {
-          return dateStr;
+        } catch { return dateStr; }
+      }
+
+      async function loadArticle() {
+        if (!articleId) { error.value = '缺少文章 ID'; loading.value = false; return; }
+        loading.value = true;
+        error.value = '';
+        try {
+          const [artData, intData, comData] = await Promise.all([
+            S.getArticle(articleId),
+            S.getArticleInteractions(articleId),
+            S.getArticleComments(articleId),
+          ]);
+          if (artData.error) { error.value = artData.message || '加载失败'; return; }
+          article.value = artData;
+          document.title = artData.title + ' — AI News Hub';
+          Object.assign(interactions, intData);
+          Object.assign(commentsData, comData);
+
+          // Record read history
+          const h = { ...S.authHeaders() };
+          delete h['Content-Type'];
+          fetch(S.API_BASE + '/history', { method: 'POST', headers: h,
+            body: JSON.stringify({ article_id: parseInt(articleId), title: artData.title, source: artData.source }) }).catch(() => {});
+
+          // Get current user id
+          try {
+            const initData = await S.apiFetch('/user/init');
+            if (initData && initData.user_id) currentUserId.value = initData.user_id;
+          } catch {}
+        } catch(e) {
+          error.value = '网络错误，请重试';
+        } finally {
+          loading.value = false;
         }
       }
 
-      // Theme toggle
-      (function() {
-        var saved = localStorage.getItem('theme');
-        if (saved) {
-          document.documentElement.setAttribute('data-theme', saved);
-        }
-        var btn = document.getElementById('themeToggle');
-        if (btn) {
-          function updateIcon() {
-            var isLight = document.documentElement.getAttribute('data-theme') === 'light';
-            btn.textContent = isLight ? '☀️' : '🌙';
+      async function toggleLike() {
+        if (!S.isLoggedIn()) { S.showToast('请先登录'); return; }
+        const doLike = !interactions.is_liked;
+        try {
+          const data = await S.toggleLike(articleId, doLike);
+          if (!data.error) {
+            interactions.is_liked = doLike;
+            interactions.likes_count = Math.max(0, interactions.likes_count + (doLike ? 1 : -1));
+            S.showToast(doLike ? '已点赞' : '取消点赞');
           }
-          updateIcon();
-          btn.addEventListener('click', function() {
-            var current = document.documentElement.getAttribute('data-theme');
-            var next = current === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-            updateIcon();
-          });
+        } catch { S.showToast('操作失败'); }
+      }
+
+      async function submitComment() {
+        const content = commentText.value.trim();
+        if (!content || content.length > 500) { S.showToast('评论内容长度需在 1-500 字符之间'); return; }
+        if (!S.isLoggedIn()) { S.showToast('请先登录'); return; }
+        submitting.value = true;
+        try {
+          const data = await S.postComment(articleId, content);
+          if (data.error) { S.showToast(data.message || '发表失败'); return; }
+          commentText.value = '';
+          S.showToast('评论成功');
+          // Reload comments
+          const comData = await S.getArticleComments(articleId);
+          Object.assign(commentsData, comData);
+        } catch { S.showToast('网络错误'); }
+        finally { submitting.value = false; }
+      }
+
+      async function deleteComment(commentId) {
+        if (!confirm('确定要删除这条评论吗？')) return;
+        try {
+          const data = await S.deleteComment(articleId, commentId);
+          if (!data.error) {
+            const idx = commentsData.comments.findIndex(c => c.id === commentId);
+            if (idx !== -1) commentsData.comments.splice(idx, 1);
+            commentsData.total = Math.max(0, (commentsData.total || 1) - 1);
+            S.showToast('已删除');
+          } else { S.showToast(data.message || '删除失败'); }
+        } catch { S.showToast('网络错误'); }
+      }
+
+      async function toggleBookmark() {
+        if (!S.isLoggedIn()) { S.showToast('请先登录'); return; }
+        const doBm = !article.value.is_bookmarked;
+        try {
+          const data = await S.toggleBookmark(articleId, doBm, article.value.title, article.value.source);
+          if (!data.error) {
+            article.value.is_bookmarked = doBm;
+            S.showToast(doBm ? '已收藏' : '已取消收藏');
+          }
+        } catch { S.showToast('操作失败'); }
+      }
+
+      function copyLink() {
+        const url = location.href;
+        if (navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(url).then(() => S.showToast('链接已复制')).catch(() => fallbackCopy(url));
+        } else { fallbackCopy(url); }
+      }
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); S.showToast('链接已复制'); } catch { S.showToast('复制失败'); }
+        document.body.removeChild(ta);
+      }
+
+      async function togglePreview() {
+        previewOpen.value = !previewOpen.value;
+        if (previewOpen.value && !previewData.value) {
+          previewLoading.value = true;
+          try {
+            previewData.value = await S.getArticleContent(articleId);
+          } catch { previewData.value = {}; }
+          finally { previewLoading.value = false; }
         }
-      })();
-    })();
+      }
+
+      onMounted(() => {
+        S.initTheme();
+        S.initAuth();
+        loadArticle();
+      });
+
+      return {
+        S, article, interactions, commentsData, loading, error,
+        currentUserId, commentText, submitting, previewOpen, previewLoading, previewData,
+        pageUrl, sourceDomain, getCatClass, formatTime,
+        toggleLike, submitComment, deleteComment, toggleBookmark, copyLink, togglePreview,
+        loadArticle,
+      };
+    }
+  }).mount('#app');
   </script>
 </body>
 </html>

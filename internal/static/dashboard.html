@@ -8,841 +8,249 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 <body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="header-logo">
+          <span class="logo-icon">📰</span>
+          <span>AI News <span class="logo-text-accent">Hub</span></span>
+        </a>
+        <span class="header-clock">{{ clock }}</span>
+      </div>
+      <div class="header-right">
+        <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
+        <a href="/dashboard.html" class="header-nav-link header-nav-link-active" title="数据看板">📊</a>
+        <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
+        <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+        <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+        <button class="theme-toggle" @click="S.toggleTheme()">
+          {{ S.store.theme === 'dark' ? '☀️' : '🌙' }}
+        </button>
+        <div class="nav-user-area" id="navUserArea"></div>
+      </div>
+    </header>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="/" class="header-logo">
-        <span class="logo-icon">📰</span>
-        <span>AI News <span class="logo-text-accent">Hub</span></span>
-      </a>
-      <span class="header-clock" id="headerClock"></span>
-    </div>
-    <div class="header-right">
-      <a href="/recommendations.html" class="header-nav-link" title="推荐">🎯</a>
-      <a href="/dashboard.html" class="header-nav-link header-nav-link-active" title="数据看板">📊</a>
-      <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
-      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
-      <div id="navUserArea" class="nav-user-area"></div>
-    </div>
-  </header>
-
-  <!-- Page Title Bar -->
-  <div class="page-title-bar">
-    <h1 class="page-title">📊 数据看板</h1>
-    <span class="page-subtitle" id="dashboardLastUpdate"></span>
-  </div>
-
-  <!-- Main Content -->
-  <main class="main-content dashboard-content">
-
-    <!-- Loading skeleton -->
-    <div id="dashboardLoading" class="dashboard-loading">
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-meta"></div></div></div>
+    <!-- Page Title -->
+    <div class="page-title-bar">
+      <h1 class="page-title">📊 数据看板</h1>
     </div>
 
-    <!-- Dashboard content (hidden until loaded) -->
-    <div id="dashboardContent" style="display:none;">
+    <!-- Loading -->
+    <div v-if="loading" class="loading-spinner" style="text-align:center;padding:60px"><span>加载中...</span></div>
 
-      <!-- Stat Cards -->
-      <div class="dash-stats-grid" id="statsGrid">
+    <main v-else class="main-content dashboard-content">
+
+      <!-- Stats Cards -->
+      <div class="dashboard-stats">
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statTotalArticles">—</div>
-          <div class="dash-stat-label">📰 总文章</div>
+          <div class="dash-stat-value">{{ stats.total_articles || 0 }}</div>
+          <div class="dash-stat-label">文章总数</div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statTodayNew">—</div>
-          <div class="dash-stat-label">🆕 今日新增</div>
+          <div class="dash-stat-value">{{ stats.total_categories || 0 }}</div>
+          <div class="dash-stat-label">分类总数</div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statActiveSources">—</div>
-          <div class="dash-stat-label">📡 活跃源</div>
+          <div class="dash-stat-value">{{ stats.total_sources || 0 }}</div>
+          <div class="dash-stat-label">数据源总数</div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statCollectRuns">—</div>
-          <div class="dash-stat-label">🔄 采集次数</div>
+          <div class="dash-stat-value">{{ stats.total_users || 0 }}</div>
+          <div class="dash-stat-label">注册用户</div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statTotalComments">—</div>
-          <div class="dash-stat-label">💬 总评论</div>
+          <div class="dash-stat-value">{{ lastCollectTime }}</div>
+          <div class="dash-stat-label">上次采集</div>
         </div>
         <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statTodayComments">—</div>
-          <div class="dash-stat-label">📝 今日评论</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statTotalLikes">—</div>
-          <div class="dash-stat-label">❤️ 总点赞</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="dash-stat-value" id="statTotalCategories">—</div>
-          <div class="dash-stat-label">🏷️ 总分类</div>
+          <div class="dash-stat-value">{{ stats.new_articles_today || 0 }}</div>
+          <div class="dash-stat-label">今日新增</div>
         </div>
       </div>
 
-      <!-- AI Summary Coverage Card -->
-      <div class="dash-ai-section" id="aiSection">
-        <div class="dash-ai-header">
-          <h2 class="dash-section-title">🤖 AI 智能摘要</h2>
-          <div class="dash-ai-actions">
-            <button class="dash-ai-btn" id="btnRecalcScores" title="重新计算所有文章评分">📊 重算评分</button>
-            <button class="dash-ai-btn dash-ai-btn-primary" id="btnGenSummaries" title="为没有 AI 摘要的文章批量生成摘要">✨ 生成摘要</button>
-          </div>
-        </div>
-        <div class="dash-ai-stats">
-          <div class="dash-ai-stat-item">
-            <span class="dash-ai-stat-value" id="aiTotalArticles">—</span>
-            <span class="dash-ai-stat-label">总文章</span>
-          </div>
-          <div class="dash-ai-stat-item">
-            <span class="dash-ai-stat-value" id="aiHasSummary">—</span>
-            <span class="dash-ai-stat-label">AI 摘要</span>
-          </div>
-          <div class="dash-ai-stat-item">
-            <span class="dash-ai-stat-value" id="aiCoverage">—</span>
-            <span class="dash-ai-stat-label">覆盖率</span>
-          </div>
-          <div class="dash-ai-progress-wrap">
-            <div class="dash-ai-progress-bar">
-              <div class="dash-ai-progress-fill" id="aiProgressFill" style="width:0%"></div>
+      <!-- 7-Day Trend -->
+      <div class="dashboard-section">
+        <h2 class="dashboard-section-title">📈 近7天趋势</h2>
+        <div class="trend-chart" v-if="trendData && trendData.length">
+          <div class="trend-bars">
+            <div v-for="(day, i) in trendData" :key="i" class="trend-bar-wrap">
+              <div class="trend-bar-value">{{ day.count }}</div>
+              <div class="trend-bar" :style="{ height: barHeight(day.count) + 'px' }"></div>
+              <div class="trend-bar-label">{{ day.label }}</div>
             </div>
           </div>
         </div>
-        <div class="dash-ai-task-status" id="aiTaskStatus" style="display:none;"></div>
+        <div v-else class="dashboard-empty">暂无趋势数据</div>
       </div>
 
-      <!-- Top Hot Articles (v1.2.0) -->
-      <div class="dash-section" id="hotArticlesSection">
-        <h2 class="dash-section-title">🔥 最热文章 TOP5</h2>
-        <div class="dash-article-list" id="hotArticlesList"></div>
-        <div class="dash-empty-state" id="hotArticlesEmpty" style="display:none;">
-          <div class="empty-icon">📭</div>
-          <p>暂无互动数据</p>
-        </div>
-      </div>
-
-      <!-- User Profile Section (v1.0.0) -->
-      <div class="dash-ai-section" id="profileSection">
-        <div class="dash-ai-header">
-          <h2 class="dash-section-title">👤 我的画像</h2>
-          <span class="dash-ai-stat-label" id="profileStreak"></span>
-        </div>
-        <div id="profileContent">
-          <div class="dash-empty-state" id="profileEmpty">
-            <div class="empty-icon">👤</div>
-            <p>登录后查看个性化画像</p>
+      <!-- Category & Source rows -->
+      <div class="dashboard-grid">
+        <!-- Categories -->
+        <div class="dashboard-section">
+          <h2 class="dashboard-section-title">📂 分类分布</h2>
+          <div class="category-list" v-if="categoryData && categoryData.length">
+            <div v-for="cat in categoryData" :key="cat.name" class="category-item">
+              <span class="category-name">{{ cat.name }}</span>
+              <span class="category-bar-wrap">
+                <span class="category-bar" :style="{ width: catWidth(cat.count) }"></span>
+              </span>
+              <span class="category-count">{{ cat.count }}</span>
+            </div>
           </div>
+          <div v-else class="dashboard-empty">暂无分类数据</div>
         </div>
-      </div>
 
-      <!-- Latest Collect Summary -->
-      <div class="dash-collect-summary" id="collectSummary" style="display:none;">
-        <span id="collectSummaryText"></span>
-      </div>
-
-      <!-- Trend Chart -->
-      <div class="dash-section">
-        <div class="dash-section-header">
-          <h2 class="dash-section-title">📈 文章增长趋势</h2>
-          <div class="dash-trend-controls">
-            <button class="dash-trend-btn active" data-days="7">7天</button>
-            <button class="dash-trend-btn" data-days="14">14天</button>
-            <button class="dash-trend-btn" data-days="30">30天</button>
+        <!-- Sources -->
+        <div class="dashboard-section">
+          <h2 class="dashboard-section-title">🌐 数据源统计</h2>
+          <div class="source-list" v-if="sourceData && sourceData.length">
+            <div v-for="src in sourceData" :key="src.name" class="source-item">
+              <span class="source-name">{{ src.name }}</span>
+              <span class="source-count">{{ src.count }} 篇</span>
+            </div>
           </div>
-        </div>
-        <div class="dash-chart" id="trendChart">
-          <div class="dash-chart-bars" id="trendBars"></div>
-          <div class="dash-chart-labels" id="trendLabels"></div>
-        </div>
-        <div class="dash-empty-state" id="trendEmpty" style="display:none;">
-          <div class="empty-icon">📭</div>
-          <p>暂无文章数据</p>
-        </div>
-      </div>
-
-      <!-- Two-column: Categories + Sources -->
-      <div class="dash-two-col">
-        <!-- Category Distribution -->
-        <div class="dash-section">
-          <h2 class="dash-section-title">🏷️ 分类分布</h2>
-          <div class="dash-category-list" id="categoryList"></div>
-          <div class="dash-empty-state" id="categoryEmpty" style="display:none;">
-            <div class="empty-icon">📭</div>
-            <p>暂无分类数据</p>
-          </div>
-        </div>
-
-        <!-- Source Health -->
-        <div class="dash-section">
-          <h2 class="dash-section-title">📡 数据源健康度</h2>
-          <div class="dash-source-list" id="sourceList"></div>
-          <div class="dash-empty-state" id="sourceEmpty" style="display:none;">
-            <div class="empty-icon">📭</div>
-            <p>暂无数据源信息</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Collect History -->
-      <div class="dash-section">
-        <h2 class="dash-section-title">🕐 最近采集记录</h2>
-        <div class="dash-history-list" id="historyList"></div>
-        <div class="dash-empty-state" id="historyEmpty" style="display:none;">
-          <div class="empty-icon">📭</div>
-          <p>暂无采集记录</p>
+          <div v-else class="dashboard-empty">暂无数据源数据</div>
         </div>
       </div>
 
       <!-- Recent Articles -->
-      <div class="dash-section">
-        <h2 class="dash-section-title">📰 最新文章速览</h2>
-        <div class="dash-article-list" id="articleList"></div>
-        <div class="dash-empty-state" id="articleEmpty" style="display:none;">
-          <div class="empty-icon">📭</div>
-          <p>暂无文章数据</p>
+      <div class="dashboard-section">
+        <h2 class="dashboard-section-title">🆕 最新文章</h2>
+        <div class="dash-article-list" v-if="recentArticles && recentArticles.length">
+          <div v-for="a in recentArticles" :key="a.id" class="dash-article-item">
+            <div class="dash-article-meta">
+              <span class="dash-article-source">{{ a.source }}</span>
+              <span>·</span>
+              <span class="dash-article-time">{{ formatTime(a.published_at) }}</span>
+            </div>
+            <a :href="'/article.html?id=' + a.id" target="_blank" class="dash-article-title">{{ a.title }}</a>
+          </div>
         </div>
+        <div v-else class="dashboard-empty">暂无最新文章</div>
       </div>
 
-    </div>
+      <!-- Recent Collect History -->
+      <div class="dashboard-section">
+        <h2 class="dashboard-section-title">📥 最近采集记录</h2>
+        <div class="collect-history-list" v-if="collectHistory && collectHistory.length">
+          <div v-for="h in collectHistory" :key="h.id" class="collect-history-item">
+            <span class="collect-history-time">{{ formatDate(h.started_at) }}</span>
+            <span class="collect-history-stat">{{ h.total_collected }} 篇</span>
+            <span class="collect-history-stat">{{ h.total_new }} 新</span>
+            <span class="collect-history-stat" :class="'status-' + h.status">{{ h.status }}</span>
+          </div>
+        </div>
+        <div v-else class="dashboard-empty">暂无采集记录</div>
+      </div>
 
-    <div class="footer-copyright">AI News Hub v1.2.0 · 用心搭建 ⚡</div>
-  </main>
+    </main>
 
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="js/store.js"></script>
   <script>
-  Auth.init();
-  </script>
-  <script>
-    (function() {
-      'use strict';
+  const { createApp, ref, reactive, computed, onMounted } = Vue;
+  createApp({
+    setup() {
+      const S = window.aiNewsHub;
 
-      const API_BASE = '/api/v1/dashboard';
-      const AI_API_BASE = '/api/v1/ai';
+      const loading = ref(true);
+      const clock = ref('');
+      const stats = reactive({});
+      const trendData = ref([]);
+      const categoryData = ref([]);
+      const sourceData = ref([]);
+      const recentArticles = ref([]);
+      const collectHistory = ref([]);
+      const lastCollectTime = ref('—');
 
-      function getUserToken() {
-        var token = localStorage.getItem('user_token');
-        if (!token) {
-          token = crypto.randomUUID();
-          localStorage.setItem('user_token', token);
-        }
-        return token;
-      }
-
-      // --- Theme ---
-      const themeToggle = document.getElementById('themeToggle');
-      const savedTheme = localStorage.getItem('theme') || 'dark';
-      if (savedTheme === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light');
-        themeToggle.textContent = '☀️';
-      }
-      themeToggle.addEventListener('click', function() {
-        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-        if (isLight) {
-          document.documentElement.removeAttribute('data-theme');
-          themeToggle.textContent = '🌙';
-          localStorage.setItem('theme', 'dark');
-        } else {
-          document.documentElement.setAttribute('data-theme', 'light');
-          themeToggle.textContent = '☀️';
-          localStorage.setItem('theme', 'light');
-        }
+      const maxCount = computed(() => {
+        if (!categoryData.value.length) return 1;
+        return Math.max(...categoryData.value.map(c => c.count));
       });
 
-      // --- Clock ---
+      const maxTrend = computed(() => {
+        if (!trendData.value.length) return 1;
+        return Math.max(...trendData.value.map(d => d.count));
+      });
+
       function updateClock() {
+        clock.value = new Date().toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+
+      function formatTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts * 1000);
         const now = new Date();
-        const h = String(now.getHours()).padStart(2, '0');
-        const m = String(now.getMinutes()).padStart(2, '0');
-        const s = String(now.getSeconds()).padStart(2, '0');
-        const el = document.getElementById('headerClock');
-        if (el) el.textContent = h + ':' + m + ':' + s;
-      }
-      updateClock();
-      setInterval(updateClock, 1000);
-
-      // --- Helpers ---
-      function fmtNum(n) { return n != null ? n.toLocaleString() : '0'; }
-
-      function fmtTime(isoStr) {
-        if (!isoStr) return '—';
-        try {
-          const d = new Date(isoStr);
-          if (isNaN(d.getTime())) return isoStr;
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          const hh = String(d.getHours()).padStart(2, '0');
-          const mi = String(d.getMinutes()).padStart(2, '0');
-          return mm + '-' + dd + ' ' + hh + ':' + mi;
-        } catch(e) { return isoStr; }
-      }
-
-      function fmtDate(isoStr) {
-        if (!isoStr) return '';
-        try {
-          const d = new Date(isoStr);
-          if (isNaN(d.getTime())) return isoStr;
-          const mm = String(d.getMonth() + 1).padStart(2, '0');
-          const dd = String(d.getDate()).padStart(2, '0');
-          return mm + '/' + dd;
-        } catch(e) { return isoStr; }
-      }
-
-      function relativeTime(isoStr) {
-        if (!isoStr) return '';
-        const d = new Date(isoStr);
-        if (isNaN(d.getTime())) return '';
-        const diff = (Date.now() - d.getTime()) / 1000;
-        if (diff < 60) return '刚刚';
+        const diff = (now - d) / 1000;
         if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
         if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
-        return Math.floor(diff / 86400) + '天前';
+        if (diff < 604800) return Math.floor(diff / 86400) + '天前';
+        return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
       }
 
-      function categoryColor(cat) {
-        const map = {
-          'AI/ML': 'var(--cat-ai_ml)',
-          '科技前沿': 'var(--cat-tech)',
-          '商业动态': 'var(--cat-biz)',
-          '开源生态': 'var(--cat-oss)',
-          '学术研究': 'var(--cat-research)',
-          '政策监管': 'var(--cat-policy)',
-          '产品发布': 'var(--cat-product)',
-          '综合资讯': 'var(--cat-general)',
-        };
-        return map[cat] || 'var(--text-muted)';
+      function formatDate(isoStr) {
+        if (!isoStr) return '—';
+        return new Date(isoStr).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       }
 
-      function statusIcon(status) {
-        switch(status) {
-          case 'healthy': return '<span class="status-dot status-healthy"></span>';
-          case 'degraded': return '<span class="status-dot status-degraded"></span>';
-          case 'failing': return '<span class="status-dot status-failing"></span>';
-          default: return '<span class="status-dot status-never"></span>';
-        }
+      function catWidth(count) {
+        const pct = (count / maxCount.value) * 100;
+        return Math.max(4, Math.min(100, pct)) + '%';
       }
 
-      function statusText(status) {
-        switch(status) {
-          case 'healthy': return '正常';
-          case 'degraded': return '降级';
-          case 'failing': return '故障';
-          default: return '未采集';
-        }
+      function barHeight(count) {
+        const pct = count / maxTrend.value;
+        return Math.max(8, Math.round(pct * 120));
       }
 
-      function runStatusIcon(status) {
-        switch(status) {
-          case 'success': return '✅';
-          case 'partial': return '⚠️';
-          case 'failed': return '❌';
-          default: return '🔄';
-        }
-      }
-
-      // --- Fetch & Render ---
       async function loadDashboard() {
-        const loading = document.getElementById('dashboardLoading');
-        const content = document.getElementById('dashboardContent');
-
+        loading.value = true;
         try {
           const [statsResp, trendResp, catResp, srcResp, articleResp, historyResp] = await Promise.all([
-            fetch(API_BASE + '/stats').then(r => r.json()),
-            fetch(API_BASE + '/trend?days=7').then(r => r.json()),
-            fetch(API_BASE + '/categories').then(r => r.json()),
-            fetch(API_BASE + '/sources').then(r => r.json()),
-            fetch(API_BASE + '/recent-articles?limit=10').then(r => r.json()),
-            fetch(API_BASE + '/collect-history?limit=10').then(r => r.json()),
+            S.api.get('/dashboard/stats'),
+            S.api.get('/dashboard/trend?days=7'),
+            S.api.get('/dashboard/categories'),
+            S.api.get('/dashboard/sources'),
+            S.api.get('/dashboard/recent-articles?limit=10'),
+            S.api.get('/dashboard/collect-history?limit=10').catch(() => ({ history: [] })),
           ]);
-
-          loading.style.display = 'none';
-          content.style.display = 'block';
-
-          renderStats(statsResp);
-          renderTrend(trendResp);
-          renderCategories(catResp);
-          renderSources(srcResp);
-          renderArticles(articleResp);
-          renderHistory(historyResp);
-
-          loadAIStatus();
-
-          document.getElementById('dashboardLastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN');
-        } catch(err) {
-          loading.innerHTML = '<div class="error-state"><div class="error-icon">⚠️</div><p>加载看板数据失败</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
-          console.error('Dashboard load error:', err);
-        }
-      }
-
-      function renderStats(stats) {
-        document.getElementById('statTotalArticles').textContent = fmtNum(stats.total_articles);
-        document.getElementById('statTodayNew').textContent = fmtNum(stats.today_new);
-        document.getElementById('statActiveSources').textContent = (stats.active_sources || 0) + '/' + (stats.total_sources || 0);
-        document.getElementById('statCollectRuns').textContent = fmtNum(stats.total_collect_runs);
-        document.getElementById('statTotalComments').textContent = fmtNum(stats.total_comments || 0);
-        document.getElementById('statTodayComments').textContent = fmtNum(stats.today_comments || 0);
-        document.getElementById('statTotalLikes').textContent = fmtNum(stats.total_likes || 0);
-        document.getElementById('statTotalCategories').textContent = fmtNum(stats.total_categories || 0);
-
-        if (stats.last_collect_time) {
-          const summary = document.getElementById('collectSummary');
-          const text = document.getElementById('collectSummaryText');
-          const lc = stats.latest_collect || {};
-          const statusEmoji = runStatusIcon(stats.last_collect_status);
-          text.innerHTML = statusEmoji + ' 最近采集 ' + relativeTime(stats.last_collect_time) +
-            (lc.total_collected ? ' · 采集 ' + lc.total_collected + ' 篇' : '') +
-            (lc.total_new ? ' · 新增 ' + lc.total_new + ' 篇' : '') +
-            (lc.errors_count ? ' · 失败 ' + lc.errors_count + ' 源' : '') +
-            (lc.duration_seconds ? ' · 耗时 ' + lc.duration_seconds + 's' : '');
-          summary.style.display = 'block';
-        }
-
-        // Hot articles
-        renderHotArticles(stats.top_hot_articles || []);
-      }
-
-      function renderHotArticles(articles) {
-        const listEl = document.getElementById('hotArticlesList');
-        const emptyEl = document.getElementById('hotArticlesEmpty');
-
-        if (!articles || articles.length === 0) {
-          listEl.style.display = 'none';
-          emptyEl.style.display = 'block';
-          return;
-        }
-
-        listEl.style.display = 'block';
-        emptyEl.style.display = 'none';
-
-        let html = '';
-        articles.forEach(function(a, i) {
-          const color = categoryColor(a.category);
-          html += '<a href="/article.html?id=' + a.id + '" class="dash-article-item">' +
-            '<span class="dash-article-dot" style="background:' + color + ';"></span>' +
-            '<span class="dash-article-title">🔥' + (i+1) + ' ' + escHTML(a.title) + '</span>' +
-            '<span class="dash-article-meta">❤️' + a.likes_count + ' 💬' + a.comments_count + '</span>' +
-            '</a>';
-        });
-
-        listEl.innerHTML = html;
-      }
-
-      // --- AI Summary Functions ---
-      async function loadAIStatus() {
-        try {
-          const res = await fetch(AI_API_BASE + '/summary-status');
-          const data = await res.json();
-
-          document.getElementById('aiTotalArticles').textContent = fmtNum(data.total_articles);
-          document.getElementById('aiHasSummary').textContent = fmtNum(data.has_ai_summary);
-          document.getElementById('aiCoverage').textContent = (data.ai_coverage || 0) + '%';
-
-          const fill = document.getElementById('aiProgressFill');
-          if (fill) {
-            fill.style.width = (data.ai_coverage || 0) + '%';
-            // Color based on coverage
-            if (data.ai_coverage >= 80) {
-              fill.style.background = 'var(--success)';
-            } else if (data.ai_coverage >= 50) {
-              fill.style.background = 'var(--warning)';
-            } else {
-              fill.style.background = 'var(--accent)';
-            }
+          Object.assign(stats, statsResp.stats || statsResp);
+          trendData.value = (trendResp.trend || trendResp.data || []).map(d => ({
+            count: d.count || d.article_count || 0,
+            label: d.label || d.date || '',
+          }));
+          categoryData.value = catResp.categories || [];
+          sourceData.value = srcResp.sources || [];
+          recentArticles.value = articleResp.articles || [];
+          collectHistory.value = historyResp.history || [];
+          if (statsResp.last_collected) {
+            lastCollectTime.value = formatDate(statsResp.last_collected);
           }
-
-          // Show task status if active
-          const taskEl = document.getElementById('aiTaskStatus');
-          if (data.task && (data.task.processing || data.task.done)) {
-            taskEl.style.display = '';
-            if (data.task.processing) {
-              taskEl.innerHTML = '🔄 正在生成摘要... 已完成 ' + (data.task.success || 0) + ' 篇';
-            } else if (data.task.done) {
-              taskEl.innerHTML = '✅ 生成完成 — 成功 ' + (data.task.success || 0) + ' 篇' +
-                (data.task.failed > 0 ? '，失败 ' + data.task.failed + ' 篇' : '');
-            }
-          } else {
-            taskEl.style.display = 'none';
-          }
-        } catch(err) {
-          console.error('AI status load error:', err);
-        }
+        } catch(e) { console.error(e); }
+        finally { loading.value = false; }
       }
 
-      async function generateSummaries() {
-        const btn = document.getElementById('btnGenSummaries');
-        if (!btn) return;
-
-        if (!confirm('确定要为没有 AI 摘要的文章批量生成摘要吗？\n\n这会调用 AI API，可能需要几分钟时间。')) {
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = '⏳ 生成中...';
-
-        try {
-          const res = await fetch(AI_API_BASE + '/generate-summaries?limit=50', { method: 'POST' });
-          const data = await res.json();
-
-          if (data.error) {
-            alert('生成失败: ' + (data.message || '未知错误'));
-            btn.disabled = false;
-            btn.textContent = '✨ 生成摘要';
-            return;
-          }
-
-          // Poll for status
-          pollAITask();
-        } catch(err) {
-          alert('请求失败: ' + err.message);
-          btn.disabled = false;
-          btn.textContent = '✨ 生成摘要';
-        }
-      }
-
-      async function recalcScores() {
-        const btn = document.getElementById('btnRecalcScores');
-        if (!btn) return;
-
-        if (!confirm('确定要重新计算所有文章的重要度评分吗？')) {
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = '⏳ 计算中...';
-
-        try {
-          const res = await fetch(AI_API_BASE + '/recalculate-scores', { method: 'POST' });
-          const data = await res.json();
-
-          if (data.error) {
-            alert('计算失败: ' + (data.message || '未知错误'));
-          } else {
-            alert('评分计算完成，已更新 ' + (data.updated || 0) + ' 篇文章');
-          }
-        } catch(err) {
-          alert('请求失败: ' + err.message);
-        }
-
-        btn.disabled = false;
-        btn.textContent = '📊 重算评分';
-      }
-
-      function pollAITask() {
-        let pollCount = 0;
-        const timer = setInterval(async function() {
-          pollCount++;
-          try {
-            const res = await fetch(AI_API_BASE + '/summary-status');
-            const data = await res.json();
-
-            loadAIDisplay(data);
-
-            if (data.task && data.task.done) {
-              clearInterval(timer);
-              const btn = document.getElementById('btnGenSummaries');
-              if (btn) {
-                btn.disabled = false;
-                btn.textContent = '✨ 生成摘要';
-              }
-            } else if (pollCount > 120) {
-              // 2 minutes timeout
-              clearInterval(timer);
-              const btn = document.getElementById('btnGenSummaries');
-              if (btn) {
-                btn.disabled = false;
-                btn.textContent = '✨ 生成摘要';
-              }
-            }
-          } catch(err) {
-            clearInterval(timer);
-            const btn = document.getElementById('btnGenSummaries');
-            if (btn) {
-              btn.disabled = false;
-              btn.textContent = '✨ 生成摘要';
-            }
-          }
-        }, 2000);
-      }
-
-      function loadAIDisplay(data) {
-        document.getElementById('aiTotalArticles').textContent = fmtNum(data.total_articles);
-        document.getElementById('aiHasSummary').textContent = fmtNum(data.has_ai_summary);
-        document.getElementById('aiCoverage').textContent = (data.ai_coverage || 0) + '%';
-
-        const fill = document.getElementById('aiProgressFill');
-        if (fill) {
-          fill.style.width = (data.ai_coverage || 0) + '%';
-          if (data.ai_coverage >= 80) {
-            fill.style.background = 'var(--success)';
-          } else if (data.ai_coverage >= 50) {
-            fill.style.background = 'var(--warning)';
-          } else {
-            fill.style.background = 'var(--accent)';
-          }
-        }
-
-        const taskEl = document.getElementById('aiTaskStatus');
-        if (data.task && (data.task.processing || data.task.done)) {
-          taskEl.style.display = '';
-          if (data.task.processing) {
-            taskEl.innerHTML = '🔄 正在生成摘要... 已完成 ' + (data.task.success || 0) + ' 篇';
-          } else if (data.task.done) {
-            taskEl.innerHTML = '✅ 生成完成 — 成功 ' + (data.task.success || 0) + ' 篇' +
-              (data.task.failed > 0 ? '，失败 ' + data.task.failed + ' 篇' : '');
-          }
-        } else {
-          taskEl.style.display = 'none';
-        }
-      }
-
-      // Bind AI buttons
-      document.getElementById('btnGenSummaries').addEventListener('click', generateSummaries);
-      document.getElementById('btnRecalcScores').addEventListener('click', recalcScores);
-
-      function renderTrend(data) {
-        const barsEl = document.getElementById('trendBars');
-        const labelsEl = document.getElementById('trendLabels');
-        const emptyEl = document.getElementById('trendEmpty');
-
-        if (!data.data || data.data.length === 0) {
-          document.getElementById('trendChart').style.display = 'none';
-          emptyEl.style.display = 'block';
-          return;
-        }
-
-        document.getElementById('trendChart').style.display = 'flex';
-        emptyEl.style.display = 'none';
-
-        const maxVal = Math.max(...data.data.map(d => d.new_articles), 1);
-
-        let barsHTML = '';
-        let labelsHTML = '';
-        data.data.forEach(function(d) {
-          const height = Math.max((d.new_articles / maxVal) * 100, 2);
-          barsHTML += '<div class="dash-bar-wrap">' +
-            '<div class="dash-bar-tooltip">' + d.new_articles + ' 篇 / 累计 ' + fmtNum(d.total_articles) + '</div>' +
-            '<div class="dash-bar" style="height:' + height + '%;"></div>' +
-            '</div>';
-          labelsHTML += '<span class="dash-bar-label">' + fmtDate(d.date) + '</span>';
-        });
-
-        barsEl.innerHTML = barsHTML;
-        labelsEl.innerHTML = labelsHTML;
-      }
-
-      function renderCategories(data) {
-        const listEl = document.getElementById('categoryList');
-        const emptyEl = document.getElementById('categoryEmpty');
-
-        if (!data.categories || data.categories.length === 0) {
-          listEl.style.display = 'none';
-          emptyEl.style.display = 'block';
-          return;
-        }
-
-        listEl.style.display = 'block';
-        emptyEl.style.display = 'none';
-
-        let html = '';
-        data.categories.forEach(function(cat) {
-          const color = categoryColor(cat.name);
-          html += '<div class="dash-category-item">' +
-            '<div class="dash-cat-header">' +
-            '<span class="dash-cat-name" style="color:' + color + ';">' + cat.name + '</span>' +
-            '<span class="dash-cat-info">' + fmtNum(cat.count) + ' 篇 · ' + cat.percentage + '%</span>' +
-            '</div>' +
-            '<div class="dash-cat-bar-bg">' +
-            '<div class="dash-cat-bar" style="width:' + cat.percentage + '%;background:' + color + ';"></div>' +
-            '</div>' +
-            '</div>';
-        });
-
-        listEl.innerHTML = html;
-      }
-
-      function renderSources(data) {
-        const listEl = document.getElementById('sourceList');
-        const emptyEl = document.getElementById('sourceEmpty');
-
-        if (!data.sources || data.sources.length === 0) {
-          listEl.style.display = 'none';
-          emptyEl.style.display = 'block';
-          return;
-        }
-
-        listEl.style.display = 'block';
-        emptyEl.style.display = 'none';
-
-        let html = '';
-        data.sources.forEach(function(src) {
-          html += '<div class="dash-source-item">' +
-            '<div class="dash-source-left">' +
-            statusIcon(src.status) +
-            '<span class="dash-source-name">' + src.name + '</span>' +
-            '</div>' +
-            '<div class="dash-source-right">' +
-            '<span class="dash-source-count">' + src.article_count + ' 篇</span>' +
-            '<span class="dash-source-rate">' + (src.success_rate > 0 ? (src.success_rate * 100).toFixed(0) + '%' : '—') + '</span>' +
-            '</div>' +
-            '</div>';
-        });
-
-        listEl.innerHTML = html;
-      }
-
-      function renderArticles(data) {
-        const listEl = document.getElementById('articleList');
-        const emptyEl = document.getElementById('articleEmpty');
-
-        if (!data.articles || data.articles.length === 0) {
-          listEl.style.display = 'none';
-          emptyEl.style.display = 'block';
-          return;
-        }
-
-        listEl.style.display = 'block';
-        emptyEl.style.display = 'none';
-
-        let html = '';
-        data.articles.forEach(function(a) {
-          const color = categoryColor(a.category);
-          html += '<a href="/article.html?id=' + a.id + '" class="dash-article-item">' +
-            '<span class="dash-article-dot" style="background:' + color + ';"></span>' +
-            '<span class="dash-article-title">' + escHTML(a.title) + '</span>' +
-            '<span class="dash-article-meta">' + a.source + '</span>' +
-            '</a>';
-        });
-
-        listEl.innerHTML = html;
-      }
-
-      function renderHistory(data) {
-        const listEl = document.getElementById('historyList');
-        const emptyEl = document.getElementById('historyEmpty');
-
-        if (!data.runs || data.runs.length === 0) {
-          listEl.style.display = 'none';
-          emptyEl.style.display = 'block';
-          return;
-        }
-
-        listEl.style.display = 'block';
-        emptyEl.style.display = 'none';
-
-        let html = '';
-        data.runs.forEach(function(run) {
-          html += '<div class="dash-history-item">' +
-            '<span class="dash-history-icon">' + runStatusIcon(run.status) + '</span>' +
-            '<span class="dash-history-time">' + fmtTime(run.started_at) + '</span>' +
-            '<span class="dash-history-detail">' +
-            '采集 ' + run.total_collected + ' 篇' +
-            (run.total_new > 0 ? ' · 新增 ' + run.total_new : '') +
-            (run.errors_count > 0 ? ' · <span class="dash-history-error">失败 ' + run.errors_count + ' 源</span>' : '') +
-            '</span>' +
-            '</div>';
-        });
-
-        listEl.innerHTML = html;
-      }
-
-      function escHTML(s) {
-        const el = document.createElement('span');
-        el.textContent = s;
-        return el.innerHTML;
-      }
-
-      // --- Trend day buttons ---
-      document.querySelectorAll('.dash-trend-btn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          document.querySelectorAll('.dash-trend-btn').forEach(function(b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          const days = btn.getAttribute('data-days');
-          fetch(API_BASE + '/trend?days=' + days)
-            .then(function(r) { return r.json(); })
-            .then(renderTrend);
-        });
+      onMounted(() => {
+        S.initTheme();
+        S.initAuth();
+        updateClock();
+        setInterval(updateClock, 30000);
+        loadDashboard();
       });
 
-      // --- Load User Profile (v1.0.0) ---
-      function loadUserProfile() {
-        var token = localStorage.getItem('user_token');
-        if (!token) return;
-
-        fetch('/api/v1/user/profile', {
-          headers: { 'X-User-Token': token },
-        }).then(function(res) { return res.json(); }).then(function(data) {
-          if (data.error || !data.interests) return;
-
-          var profileContent = document.getElementById('profileContent');
-          var profileEmpty = document.getElementById('profileEmpty');
-          var profileSection = document.getElementById('profileSection');
-
-          if (profileEmpty) profileEmpty.style.display = 'none';
-
-          // Streak info
-          var streakEl = document.getElementById('profileStreak');
-          if (streakEl && data.reading_streak > 0) {
-            streakEl.textContent = '🔥 连续阅读 ' + data.reading_streak + ' 天';
-          }
-
-          // Interest tags cloud
-          var interests = data.interests || {};
-          var tags = Object.keys(interests);
-          if (tags.length > 0) {
-            // Sort by weight
-            tags.sort(function(a, b) { return interests[b] - interests[a]; });
-
-            var tagsHTML = '<div class="profile-tag-cloud">';
-            tags.forEach(function(tag) {
-              var weight = interests[tag];
-              var sizeClass = '';
-              if (weight >= 0.7) sizeClass = 'tag-xl';
-              else if (weight >= 0.4) sizeClass = 'tag-lg';
-              else if (weight >= 0.2) sizeClass = 'tag-md';
-              else sizeClass = 'tag-sm';
-              tagsHTML += '<span class="profile-tag ' + sizeClass + '">' + escapeHTML(tag) + '</span>';
-            });
-            tagsHTML += '</div>';
-
-            // Stats row
-            tagsHTML += '<div class="profile-stats-row">'
-              + '<span class="profile-stat">📊 阅读 ' + (data.total_reads || 0) + ' 篇</span>'
-              + '<span class="profile-stat">📌 收藏 ' + (data.total_bookmarks || 0) + ' 篇</span>'
-              + '<span class="profile-stat">📅 共 ' + (data.total_reading_days || 0) + ' 天阅读</span>'
-              + '</div>';
-
-            // Preferred categories
-            if (data.preferred_categories && data.preferred_categories.length > 0) {
-              tagsHTML += '<div class="profile-cats">偏好分类: ' + data.preferred_categories.map(function(c) {
-                return '<span class="profile-cat-tag">' + escapeHTML(c) + '</span>';
-              }).join('') + '</div>';
-            }
-
-            profileContent.innerHTML = tagsHTML;
-          } else {
-            profileContent.innerHTML = '<div class="dash-empty-state">'
-              + '<div class="empty-icon">📖</div>'
-              + '<p>暂无兴趣标签，阅读更多文章来构建你的画像</p>'
-              + '<p class="empty-sub">已阅读 ' + (data.total_reads || 0) + ' 篇 · 收藏 ' + (data.total_bookmarks || 0) + ' 篇</p>'
-              + '</div>';
-          }
-        }).catch(function() {});
-      }
-
-      function escapeHTML(s) {
-        var el = document.createElement('span');
-        el.textContent = s;
-        return el.innerHTML;
-      }
-
-      // --- Init ---
-      loadDashboard();
-      loadUserProfile();
-
-    })();
+      return {
+        S, loading, clock, stats, trendData, categoryData, sourceData,
+        recentArticles, collectHistory, lastCollectTime,
+        formatTime, formatDate, catWidth, barHeight,
+      };
+    }
+  }).mount('#app');
   </script>
 </body>
 </html>

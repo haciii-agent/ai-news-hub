@@ -42,6 +42,17 @@
   let _isLoggedIn = false;
   let _collectStatus = null;
 
+  // ─── Reactive store (for Vue 3 compatibility) ───────────────────────────────
+  // Plain object (Vanilla JS, not reactive — Vue pages handle reactivity themselves)
+  const store = {
+    currentUser: null,
+    isLoggedIn: false,
+    navVisible: false,
+    theme: localStorage.getItem(THEME_KEY) || 'light',
+    loading: false,
+    collectStatus: null,
+  };
+
   // ─── Auth headers ─────────────────────────────────────────────────────────
 
   function authHeaders() {
@@ -278,6 +289,57 @@
     del: (path) => apiFetch(path, { method: 'DELETE' }),
   };
 
+  // ─── Article API ─────────────────────────────────────────────────────────
+
+  async function getArticle(id) {
+    return apiFetch('/articles/' + encodeURIComponent(id));
+  }
+  async function getArticleContent(id) {
+    return apiFetch('/articles/' + encodeURIComponent(id) + '/content');
+  }
+  async function getArticleInteractions(id) {
+    return apiFetch('/articles/' + encodeURIComponent(id) + '/interactions');
+  }
+  async function getArticleComments(id, page, perPage) {
+    return apiFetch('/articles/' + encodeURIComponent(id) + '/comments?page=' + (page||1) + '&per_page=' + (perPage||50));
+  }
+  async function postComment(articleId, content) {
+    return apiFetch('/articles/' + encodeURIComponent(articleId) + '/comments', {
+      method: 'POST', body: JSON.stringify({ content }),
+    });
+  }
+  async function deleteComment(articleId, commentId) {
+    return apiFetch('/articles/' + encodeURIComponent(articleId) + '/comments/' + commentId, { method: 'DELETE' });
+  }
+  async function toggleLike(articleId, doLike) {
+    return apiFetch('/articles/' + encodeURIComponent(articleId) + '/like', {
+      method: doLike ? 'POST' : 'DELETE',
+    });
+  }
+  async function toggleBookmark(articleId, doBookmark, title, source) {
+    if (doBookmark) {
+      return apiFetch('/bookmarks', { method: 'POST', body: JSON.stringify({ article_id: articleId, title, source }) });
+    }
+    return apiFetch('/bookmarks/' + articleId, { method: 'DELETE' });
+  }
+
+  // ─── Admin API ────────────────────────────────────────────────────────────
+
+  async function adminGetUsers(page, perPage, search) {
+    let path = '/admin/users?page=' + (page||1) + '&per_page=' + (perPage||20);
+    if (search) path += '&search=' + encodeURIComponent(search);
+    return apiFetch(path);
+  }
+  async function adminGetUser(id) {
+    return apiFetch('/admin/users/' + id);
+  }
+  async function adminUpdateRole(id, role) {
+    return apiFetch('/admin/users/' + id + '/role', { method: 'PUT', body: JSON.stringify({ role }) });
+  }
+  async function adminUpdateStatus(id, disabled) {
+    return apiFetch('/admin/users/' + id + '/status', { method: 'PUT', body: JSON.stringify({ disabled }) });
+  }
+
   // ─── Auth compatibility shim (for existing pages using Auth.*) ──────────────
   // Deprecated: use aiNewsHub.* instead. Will be removed in v2.0.
   const _authCompat = {
@@ -327,6 +389,26 @@
     CATEGORY_COLORS, KNOWN_CATEGORIES,
     recordRead,
     API_BASE,
+    // Article
+    getArticle, getArticleContent, getArticleInteractions, getArticleComments,
+    postComment, deleteComment, toggleLike, toggleBookmark,
+    // Admin
+    adminGetUsers, adminGetUser, adminUpdateRole, adminUpdateStatus,
   };
+
+  // Also expose on aiNewsHub for direct access
+  global.aiNewsHub.getArticle = getArticle;
+  global.aiNewsHub.getArticleContent = getArticleContent;
+  global.aiNewsHub.getArticleInteractions = getArticleInteractions;
+  global.aiNewsHub.getArticleComments = getArticleComments;
+  global.aiNewsHub.postComment = postComment;
+  global.aiNewsHub.deleteComment = deleteComment;
+  global.aiNewsHub.toggleLike = toggleLike;
+  global.aiNewsHub.toggleBookmark = toggleBookmark;
+  global.aiNewsHub.adminGetUsers = adminGetUsers;
+  global.aiNewsHub.adminGetUser = adminGetUser;
+  global.aiNewsHub.adminUpdateRole = adminUpdateRole;
+  global.aiNewsHub.adminUpdateStatus = adminUpdateStatus;
+  global.aiNewsHub.store = store;
 
 })(window);

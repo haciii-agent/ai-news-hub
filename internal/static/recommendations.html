@@ -8,269 +8,161 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📰</text></svg>">
 </head>
 <body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <a href="/" class="header-logo">
+          <span class="logo-icon">📰</span>
+          <span>AI News <span class="logo-text-accent">Hub</span></span>
+        </a>
+        <span class="header-clock"></span>
+      </div>
+      <div class="header-right">
+        <a href="/recommendations.html" class="header-nav-link header-nav-link-active" title="推荐">🎯</a>
+        <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
+        <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
+        <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
+        <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
+        <button class="theme-toggle" @click="S.toggleTheme()">{{ S.store.theme === 'dark' ? '☀️' : '🌙' }}</button>
+        <div class="nav-user-area" id="navUserArea"></div>
+      </div>
+    </header>
 
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <a href="/" class="header-logo">
-        <span class="logo-icon">📰</span>
-        <span>AI News <span class="logo-text-accent">Hub</span></span>
-      </a>
-      <span class="header-clock" id="headerClock"></span>
+    <!-- Page Title -->
+    <div class="page-title-bar">
+      <h1 class="page-title">🎯 猜你喜欢</h1>
+      <span class="page-subtitle">基于你的阅读兴趣个性化推荐</span>
     </div>
-    <div class="header-right">
-      <a href="/recommendations.html" class="header-nav-link header-nav-link-active" title="推荐">🎯</a>
-      <a href="/dashboard.html" class="header-nav-link" title="数据看板">📊</a>
-      <a href="/trends.html" class="header-nav-link" title="趋势分析">📈</a>
-      <a href="/bookmarks.html" class="header-nav-link" title="收藏">📌</a>
-      <a href="/history.html" class="header-nav-link" title="阅读历史">📖</a>
-      <button class="theme-toggle" id="themeToggle" title="切换主题">🌙</button>
-      <div id="navUserArea" class="nav-user-area"></div>
-    </div>
-  </header>
 
-  <!-- Page Title Bar -->
-  <div class="page-title-bar">
-    <h1 class="page-title">🎯 猜你喜欢</h1>
-    <span class="page-subtitle" id="recReason">个性化推荐</span>
+    <!-- Loading -->
+    <div v-if="loading" class="loading-spinner" style="text-align:center;padding:60px"><span>加载中...</span></div>
+
+    <!-- Empty: not logged in -->
+    <div v-else-if="!S.isLoggedIn()" class="empty-state" style="padding:60px;text-align:center">
+      <p>登录后可查看个性化推荐</p>
+      <a href="/login.html" class="btn-primary" style="display:inline-block;margin-top:16px">去登录</a>
+    </div>
+
+    <!-- Empty: no data -->
+    <div v-else-if="!loading && !articles.length" class="empty-state" style="padding:60px;text-align:center">
+      <p>暂无推荐内容</p>
+      <p style="font-size:13px;color:var(--text-muted);margin-top:8px">阅读更多文章后，推荐会更精准</p>
+      <a href="/" class="btn-primary" style="display:inline-block;margin-top:16px">去首页看看</a>
+    </div>
+
+    <!-- Articles -->
+    <main v-else class="main-content">
+      <div class="article-list">
+        <article v-for="a in articles" :key="a.id" class="article-card">
+          <div class="article-meta">
+            <span class="article-source">{{ a.source }}</span>
+            <span class="article-sep">·</span>
+            <span class="article-time">{{ formatTime(a.published_at) }}</span>
+            <span v-if="a.language === 'zh'" class="lang-badge">中文</span>
+            <span v-else class="lang-badge lang-en">EN</span>
+          </div>
+          <h2 class="article-title">
+            <a :href="'/article.html?id=' + a.id" target="_blank" @click="recordRead(a)">{{ a.title }}</a>
+          </h2>
+          <p class="article-summary" v-if="a.summary">{{ a.summary }}</p>
+          <div class="article-footer">
+            <div class="article-tags">
+              <span v-for="cat in (a.categories || '').split(',').filter(c=>c)" :key="cat"
+                class="article-tag" :class="getCatClass(cat)">{{ cat }}</span>
+            </div>
+            <div class="article-actions">
+              <button class="action-btn bookmark-btn" :class="{ bookmarked: a.is_bookmarked }"
+                @click="toggleBookmark(a)">{{ a.is_bookmarked ? '📌' : '📍' }}</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div v-if="hasMore" class="load-more-wrap">
+        <button class="load-more-btn" @click="loadMore" :disabled="loadingMore">
+          {{ loadingMore ? '加载中...' : '加载更多' }}
+        </button>
+      </div>
+    </main>
+
+    <div class="footer-copyright">AI News Hub v1.3.0 · 用心搭建 ⚡</div>
   </div>
 
-  <!-- Main Content -->
-  <main class="main-content">
-    <div id="articleList">
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
-      <div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>
-    </div>
+  <div id="toast"></div>
 
-    <div id="loadMoreWrap" class="load-more-wrap" style="display:none;">
-      <button id="loadMoreBtn" class="load-more-btn">加载更多</button>
-    </div>
-
-    <div id="statsFooter" class="stats-footer"></div>
-    <div class="footer-copyright">AI News Hub v1.0.0 · 用心搭建 ⚡</div>
-  </main>
-
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="js/store.js"></script>
   <script>
-  Auth.init();
-  </script>
-  <script>
-    (function() {
-      'use strict';
-      var API_BASE = '/api/v1';
-      var PER_PAGE = 20;
-      var currentPage = 1;
-      var totalPages = 1;
-      var totalArticles = 0;
-      var isLoading = false;
-      var recReason = '';
+  const { createApp, ref, onMounted } = Vue;
+  createApp({
+    setup() {
+      const S = window.aiNewsHub;
+      const articles = ref([]);
+      const loading = ref(true);
+      const loadingMore = ref(false);
+      const page = ref(1);
+      const hasMore = ref(true);
 
-      var articleListEl = document.getElementById('articleList');
-      var loadMoreWrap = document.getElementById('loadMoreWrap');
-      var loadMoreBtn = document.getElementById('loadMoreBtn');
-      var statsFooter = document.getElementById('statsFooter');
-      var recReasonEl = document.getElementById('recReason');
-
-      function getUserToken() {
-        var token = localStorage.getItem('user_token');
-        if (!token) {
-          token = crypto.randomUUID();
-          localStorage.setItem('user_token', token);
+      async function load(recursive) {
+        if (!recursive) loading.value = true;
+        else loadingMore.value = true;
+        try {
+          const data = await S.api.get('/recommendations?page=' + page.value + '&per_page=20');
+          const list = Array.isArray(data.articles) ? data.articles : [];
+          if (recursive) articles.value.push(...list);
+          else articles.value = list;
+          hasMore.value = list.length >= 20;
+        } finally {
+          loading.value = false;
+          loadingMore.value = false;
         }
-        return token;
       }
 
-      // Theme
-      (function() {
-        var saved = localStorage.getItem('theme');
-        if (saved) document.documentElement.setAttribute('data-theme', saved);
-        var btn = document.getElementById('themeToggle');
-        if (btn) {
-          function updateIcon() {
-            btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
-          }
-          updateIcon();
-          btn.addEventListener('click', function() {
-            var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-            updateIcon();
-          });
-        }
-      })();
+      function loadMore() { page.value++; load(true); }
 
-      // Clock
-      function updateClock() {
-        var now = new Date();
-        var h = String(now.getHours()).padStart(2, '0');
-        var m = String(now.getMinutes()).padStart(2, '0');
-        var s = String(now.getSeconds()).padStart(2, '0');
-        var el = document.getElementById('headerClock');
-        if (el) el.textContent = h + ':' + m + ':' + s;
-      }
-      updateClock();
-      setInterval(updateClock, 1000);
+      function recordRead(a) { S.recordRead({ id: a.id, title: a.title, source: a.source }); }
 
-      // Load recommendations
-      function loadRecommendations(append) {
-        if (isLoading) return;
-        isLoading = true;
-
-        if (!append) {
-          articleListEl.innerHTML = renderSkeletons(4);
-          loadMoreWrap.style.display = 'none';
-          statsFooter.textContent = '';
-        } else {
-          loadMoreBtn.disabled = true;
-          loadMoreBtn.textContent = '加载中';
-        }
-
-        fetch(API_BASE + '/recommendations?page=' + currentPage + '&per_page=' + PER_PAGE, {
-          headers: { 'X-User-Token': getUserToken() },
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(data) {
-          if (data.error) {
-            if (!append) articleListEl.innerHTML = renderErrorState(data.message);
-            return;
-          }
-
-          var articles = data.articles || [];
-          totalPages = data.total_pages || 1;
-          totalArticles = data.total || 0;
-          recReason = data.reason || '';
-
-          if (recReasonEl) recReasonEl.textContent = recReason;
-
-          if (append) {
-            if (articles.length > 0) {
-              articleListEl.insertAdjacentHTML('beforeend', renderArticles(articles));
-            }
+      async function toggleBookmark(a) {
+        if (!S.isLoggedIn()) { S.showToast('请先登录'); return; }
+        try {
+          if (a.is_bookmarked) {
+            await S.api.del('/bookmarks/' + a.id);
+            a.is_bookmarked = false;
+            S.showToast('已取消收藏');
           } else {
-            if (articles.length === 0) {
-              articleListEl.innerHTML = '<div class="empty-state">'
-                + '<div class="empty-icon">🎯</div>'
-                + '<p>暂无推荐文章</p>'
-                + '<p class="empty-sub">阅读更多文章，推荐会越来越准</p>'
-                + '</div>';
-            } else {
-              articleListEl.innerHTML = renderArticles(articles);
-            }
+            await S.api.post('/bookmarks', { article_id: a.id, title: a.title, source: a.source });
+            a.is_bookmarked = true;
+            S.showToast('已收藏');
           }
-
-          if (currentPage < totalPages) {
-            loadMoreWrap.style.display = '';
-            loadMoreBtn.disabled = false;
-            loadMoreBtn.textContent = '加载更多';
-          } else {
-            loadMoreWrap.style.display = 'none';
-          }
-
-          if (totalArticles > 0) {
-            statsFooter.textContent = '共 ' + totalArticles + ' 篇 · 第 ' + currentPage + '/' + totalPages + ' 页';
-          }
-        })
-        .catch(function(err) {
-          console.error('Load recommendations error:', err);
-          if (!append) articleListEl.innerHTML = renderErrorState(null);
-        })
-        .finally(function() {
-          isLoading = false;
-          loadMoreBtn.disabled = false;
-        });
+        } catch { S.showToast('操作失败'); }
       }
 
-      loadMoreBtn.addEventListener('click', function() {
-        if (isLoading || currentPage >= totalPages) return;
-        currentPage++;
-        loadRecommendations(true);
+      function formatTime(ts) {
+        if (!ts) return '';
+        const d = new Date(ts * 1000);
+        const now = new Date();
+        const diff = (now - d) / 1000;
+        if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+        if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+        if (diff < 604800) return Math.floor(diff / 86400) + '天前';
+        return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+      }
+
+      function getCatClass(cat) {
+        const m = S.CATEGORY_COLORS[cat.trim()] || 'tag-general';
+        return m.replace('tag-', '');
+      }
+
+      onMounted(() => {
+        S.initTheme();
+        S.initAuth();
+        load(false);
       });
 
-      function renderArticles(articles) {
-        return articles.map(function(a, i) {
-          var timeStr = formatTime(a.published_at || a.collected_at);
-          var detailHref = '/article.html?id=' + a.id;
-          var summary = a.ai_summary || (a.summary ? escapeHtml(a.summary) : '');
-          if (a.ai_summary) summary = escapeHtml(a.ai_summary);
-          var category = a.category || '未分类';
-
-          // Recommendation reason tag
-          var recTag = '';
-          if (a.rec_reason) {
-            recTag = '<span class="rec-reason-tag">💡 ' + escapeHtml(a.rec_reason) + '</span>';
-          }
-
-          // Score badge
-          var scoreBadge = '';
-          if (a.rec_score > 0) {
-            var score = Math.round(a.rec_score);
-            if (score >= 60) {
-              scoreBadge = '<span class="rec-score-badge rec-score-high">' + score + '</span>';
-            } else if (score >= 30) {
-              scoreBadge = '<span class="rec-score-badge rec-score-med">' + score + '</span>';
-            }
-          }
-
-          return '<div class="article-card" data-category="' + escapeHtml(category) + '">'
-            + '<div class="card-body">'
-            + '<div class="card-title-row">'
-            + '<h3 class="card-title"><a href="' + detailHref + '">' + escapeHtml(a.title) + '</a></h3>'
-            + scoreBadge
-            + '<a class="card-url-link" href="' + escapeHtml(a.url) + '" target="_blank" rel="noopener">🔗</a>'
-            + '</div>'
-            + (summary ? '<p class="card-summary">' + summary + '</p>' : '')
-            + '<div class="card-meta">'
-            + '<span class="card-source">' + escapeHtml(a.source) + '</span>'
-            + '<span class="card-dot">·</span>'
-            + '<span class="card-time">' + timeStr + '</span>'
-            + '<span class="tag tag-' + slugify(category) + '">' + escapeHtml(category) + '</span>'
-            + '</div>'
-            + (recTag ? '<div class="card-rec-footer">' + recTag + '</div>' : '')
-            + '</div>'
-            + '</div>';
-        }).join('');
-      }
-
-      function renderSkeletons(count) {
-        var html = '';
-        for (var i = 0; i < count; i++) {
-          html += '<div class="skeleton-card"><div class="skeleton-body"><div class="skeleton-title"></div><div class="skeleton-summary"></div><div class="skeleton-summary"></div><div class="skeleton-meta"></div></div></div>';
-        }
-        return html;
-      }
-
-      function renderErrorState(msg) {
-        return '<div class="error-state"><div class="error-icon">🔌</div><p>' + escapeHtml(msg || '加载失败，请稍后再试') + '</p><p class="error-retry" onclick="location.reload()">点击重试</p></div>';
-      }
-
-      function formatTime(dateStr) {
-        if (!dateStr) return '';
-        try {
-          var d = new Date(dateStr);
-          var diff = new Date() - d;
-          if (diff < 60000) return '刚刚';
-          if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
-          if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
-          if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
-          return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-        } catch (e) { return dateStr; }
-      }
-
-      function escapeHtml(str) {
-        if (!str) return '';
-        var d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
-      }
-
-      function slugify(text) {
-        return (text || '').toLowerCase().replace(/[^a-z0-9_\u4e00-\u9fff]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-      }
-
-      loadRecommendations(false);
-    })();
+      return { S, articles, loading, loadingMore, hasMore, loadMore, recordRead, toggleBookmark, formatTime, getCatClass };
+    }
+  }).mount('#app');
   </script>
 </body>
 </html>
