@@ -23,15 +23,15 @@ log:
 # AI 智能摘要配置
 # API Key 通过环境变量 AI_API_KEY 设置（不进 git）
 ai:
-  api_base: "https://api.minimaxi.com/v1"
-  api_key: ""
-  model: "MiniMax-M2.7-highspeed"
-  max_concurrent: 5
-  timeout: 30s
+  api_base: "https://api.minimaxi.com/v1"   # MiniMax API base
+  api_key: ""                               # 通过 AI_API_KEY 环境变量设置
+  model: "MiniMax-M2.7-highspeed"           # MiniMax 模型
+  max_concurrent: 5                        # 并发请求数
+  timeout: 30s                             # 单篇超时
 
 # 微信公众号发布配置
 # 通过环境变量 WX_APPID 和 WX_SECRET 设置（不进 git）
 wechat:
-  appid: ""
-  secret: ""
-  account_id: ""
+  appid: ""       # 通过 WX_APPID 环境变量设置
+  secret: ""      # 通过 WX_SECRET 环境变量设置
+  account_id: ""  # 公众号ID（如 gh_2030ec9a32fe）

@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"ai-news-hub/config"
+	"ai-news-hub/internal/ai"
+	"ai-news-hub/internal/wechat"
 	"ai-news-hub/internal/api"
 	"ai-news-hub/internal/auth"
 	"ai-news-hub/internal/collector"
@@ -62,11 +64,27 @@ func main() {
 	// Create article store first (needed by both API server and scheduler).
 	articleStore := store.NewArticleStore(db)
 
-	// Initialize collect scheduler first (needs articleStore).
+	// Initialize AI summarizer (nil if not configured).
+	summarizer := ai.NewSummarizer(cfg.AI)
+	if summarizer != nil {
+		log.Printf("[main] AI summarizer enabled (model: %s)", cfg.AI.Model)
+	} else {
+		log.Printf("[main] AI summarizer disabled (no API key configured)")
+	}
+
+	// Initialize WeChat publisher (nil if not configured).
+	wechatPub := wechat.NewPublisher(cfg.WeChat, articleStore)
+	if wechatPub.Available() {
+		log.Printf("[main] WeChat publisher enabled (account: %s)", cfg.WeChat.AccountID)
+	} else {
+		log.Printf("[main] WeChat publisher disabled (not configured or unavailable)")
+	}
+
+	// Initialize collect scheduler (needs articleStore).
 	collectScheduler := collector.NewCollectScheduler(&cfg.Collector, articleStore)
 
-	// Initialize API server (wires collector, classifier, store).
-	srv, err := api.NewServer(db, cfg, version, articleStore, collectScheduler)
+	// Initialize API server (wires collector, classifier, store, summarizer).
+	srv, err := api.NewServer(db, cfg, version, articleStore, collectScheduler, summarizer)
 	if err != nil {
 		log.Fatalf("[main] failed to init server: %v", err)
 	}
@@ -105,6 +123,9 @@ func main() {
 		}
 		log.Printf("[scheduler] 首次采集完成：采集 %d 篇，失败 %d 个源", totalArticles, totalErr)
 
+		// 采集完成后自动生成 AI 摘要并发布微信
+		postCollectActions(summarizer, wechatPub, articleStore)
+
 		// 每4小时执行一次
 		ticker := time.NewTicker(4 * time.Hour)
 		defer ticker.Stop()
@@ -121,6 +142,7 @@ func main() {
 					}
 				}
 				log.Printf("[scheduler] 定时采集完成：采集 %d 篇，失败 %d 个源", totalArticles, totalErr)
+				postCollectActions(summarizer, wechatPub, articleStore)
 			case <-shutdownCh:
 				log.Println("[scheduler] 收到关闭信号，退出")
 				return
@@ -133,6 +155,38 @@ func main() {
 		log.Fatalf("[main] server error: %v", err)
 	}
 	log.Println("[main] server stopped")
+}
+// postCollectActions runs after each collection batch: AI summaries + WeChat publish.
+func postCollectActions(summarizer *ai.Summarizer, pub *wechat.Publisher, articleStore store.ArticleStore) {
+	if summarizer != nil && summarizer.Available() {
+		summarizeRecent(summarizer, articleStore)
+	}
+	if pub != nil && pub.Available() {
+		if err := pub.PublishTopArticles(); err != nil {
+			log.Printf("[wechat] publish failed: %v", err)
+		}
+	}
+}
+
+
+// summarizeRecent fetches recent articles without AI summaries and generates them.
+// It processes up to limit articles at a time to avoid overwhelming the AI API.
+func summarizeRecent(summarizer *ai.Summarizer, articleStore store.ArticleStore) {
+	if summarizer == nil || !summarizer.Available() {
+		return
+	}
+	articles, err := articleStore.GetArticlesWithoutSummary(30)
+	if err != nil {
+		log.Printf("[scheduler] summarizeRecent: failed to get articles: %v", err)
+		return
+	}
+	if len(articles) == 0 {
+		log.Printf("[scheduler] summarizeRecent: no articles need summarization")
+		return
+	}
+	log.Printf("[scheduler] summarizeRecent: processing %d articles...", len(articles))
+	success, failed := summarizer.GenerateSummariesBatch(articles, articleStore)
+	log.Printf("[scheduler] summarizeRecent: done — success=%d, failed=%d", success, failed)
 }
 
 // handleAdminCommand processes admin CLI subcommands.

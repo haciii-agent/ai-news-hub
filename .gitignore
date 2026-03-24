@@ -21,3 +21,6 @@ frontend/node_modules/
 dist/
 frontend/dist/
 *.log
+
+# Local config overrides (contains secrets)
+config.yaml

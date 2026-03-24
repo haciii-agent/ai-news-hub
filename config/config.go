@@ -17,6 +17,7 @@ type Config struct {
 	AI         AIConfig         `yaml:"ai"`
 	Auth       AuthConfig       `yaml:"auth"`
 	Log        LogConfig        `yaml:"log"`
+	WeChat     WeChatConfig     `yaml:"wechat"`
 }
 
 // AuthConfig holds authentication settings.
@@ -55,6 +56,22 @@ func (a AIConfig) GetAPIKey() string {
 	return a.APIKey
 }
 
+// GetAPIBase returns the API base URL, preferring the environment variable.
+func (a AIConfig) GetAPIBase() string {
+	if v := os.Getenv("AI_API_BASE"); v != "" {
+		return v
+	}
+	return a.APIBase
+}
+
+// GetModel returns the model name, preferring the environment variable.
+func (a AIConfig) GetModel() string {
+	if v := os.Getenv("AI_MODEL"); v != "" {
+		return v
+	}
+	return a.Model
+}
+
 // ServerConfig holds HTTP server settings.
 type ServerConfig struct {
 	Host string `yaml:"host"`
@@ -83,6 +100,34 @@ type CollectorConfig struct {
 // ClassifierConfig holds classifier settings.
 type ClassifierConfig struct {
 	RulesPath string `yaml:"rules_path"`
+}
+
+// WeChatConfig holds WeChat public account settings for article publishing.
+type WeChatConfig struct {
+	AppID     string `yaml:"appid"`
+	Secret    string `yaml:"secret"`
+	AccountID string `yaml:"account_id"`
+}
+
+// IsEnabled returns true if WeChat publishing is configured.
+func (w WeChatConfig) IsEnabled() bool {
+	return w.GetAppID() != "" && w.GetSecret() != ""
+}
+
+// GetAppID returns the AppID, preferring environment variable.
+func (w WeChatConfig) GetAppID() string {
+	if v := os.Getenv("WX_APPID"); v != "" {
+		return v
+	}
+	return w.AppID
+}
+
+// GetSecret returns the Secret, preferring environment variable.
+func (w WeChatConfig) GetSecret() string {
+	if v := os.Getenv("WX_SECRET"); v != "" {
+		return v
+	}
+	return w.Secret
 }
 
 // LogConfig holds logging settings.

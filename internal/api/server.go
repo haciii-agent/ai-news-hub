@@ -36,21 +36,13 @@ type Server struct {
 }
 
 // NewServer creates a fully-wired HTTP server with all routes registered.
-func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore store.ArticleStore, collectScheduler *collector.CollectScheduler) (*Server, error) {
+func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore store.ArticleStore, collectScheduler *collector.CollectScheduler, summarizer *ai.Summarizer) (*Server, error) {
 	userStore := store.NewUserStore(db)
 
 	// Initialize classifier
 	clr, err := classifier.NewManager(cfg.Classifier.RulesPath)
 	if err != nil {
 		return nil, fmt.Errorf("init classifier: %w", err)
-	}
-
-	// Initialize AI summarizer (nil if not configured)
-	summarizer := ai.NewSummarizer(cfg.AI)
-	if summarizer != nil {
-		log.Println("[api] AI summarizer enabled (model: " + cfg.AI.Model + ")")
-	} else {
-		log.Println("[api] AI summarizer disabled (no API key configured)")
 	}
 
 	srv := &Server{

@@ -255,6 +255,7 @@ func migrate(db *sql.DB) error {
 		"ALTER TABLE articles ADD COLUMN ai_summary TEXT",
 		"ALTER TABLE articles ADD COLUMN importance_score REAL DEFAULT 0",
 		"ALTER TABLE articles ADD COLUMN summary_generated_at DATETIME",
+		"ALTER TABLE articles ADD COLUMN translated_title TEXT",
 	}
 	for _, stmt := range alterStatements {
 		if _, err := db.Exec(stmt); err != nil {

@@ -21,6 +21,7 @@ type Article struct {
 	CollectedAt       string   `json:"collected_at"`
 	Language          string   `json:"language"`
 	AISummary         string   `json:"ai_summary,omitempty"`
+	TranslatedTitle   string   `json:"translated_title,omitempty"`
 	ImportanceScore   float64  `json:"importance_score"`
 	SummaryGeneratedAt *string `json:"summary_generated_at,omitempty"`
 }
@@ -51,6 +52,7 @@ type ArticleStore interface {
 	InsertCollectRun(run *CollectRun) (int64, error)
 	GetLatestCollectRun() (*CollectRun, error)
 	UpdateAISummary(id int64, summary string) error
+	UpdateTranslatedTitle(id int64, title string) error
 	UpdateImportanceScore(id int64, score float64) error
 	GetArticlesWithoutSummary(limit int) ([]Article, error)
 	GetAllArticleIDs() ([]int64, error)
@@ -228,7 +230,7 @@ func (s *articleStore) QueryArticles(filter ArticleFilter) ([]Article, int, erro
 
 	// Paginated results.
 	offset := (filter.Page - 1) * filter.PerPage
-	querySQL := fmt.Sprintf("SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(importance_score,0), summary_generated_at FROM articles %s ORDER BY %s LIMIT ? OFFSET ?", where, orderBy)
+	querySQL := fmt.Sprintf("SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(translated_title,''), COALESCE(importance_score,0), summary_generated_at FROM articles %s ORDER BY %s LIMIT ? OFFSET ?", where, orderBy)
 
 	qArgs := append(args, filter.PerPage, offset)
 	rows, err := s.db.Query(querySQL, qArgs...)
@@ -254,6 +256,7 @@ func (s *articleStore) QueryArticles(filter ArticleFilter) ([]Article, int, erro
 			&a.CollectedAt,
 			&a.Language,
 			&a.AISummary,
+			&a.TranslatedTitle,
 			&a.ImportanceScore,
 			&a.SummaryGeneratedAt,
 		); err != nil {
@@ -272,7 +275,7 @@ func (s *articleStore) QueryArticles(filter ArticleFilter) ([]Article, int, erro
 func (s *articleStore) GetArticleByID(id int64) (*Article, error) {
 	var a Article
 	err := s.db.QueryRow(`
-		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(importance_score,0), summary_generated_at
+		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(translated_title,''), COALESCE(importance_score,0), summary_generated_at
 		FROM articles WHERE id = ?
 	`, id).Scan(
 		&a.ID,
@@ -557,6 +560,15 @@ func (s *articleStore) UpdateAISummary(id int64, summary string) error {
 	return nil
 }
 
+// UpdateTranslatedTitle updates the translated_title field for an article.
+func (s *articleStore) UpdateTranslatedTitle(id int64, title string) error {
+	_, err := s.db.Exec(`UPDATE articles SET translated_title = ? WHERE id = ?`, title, id)
+	if err != nil {
+		return fmt.Errorf("update translated_title for article %d: %w", id, err)
+	}
+	return nil
+}
+
 // UpdateImportanceScore updates the importance_score field for an article.
 func (s *articleStore) UpdateImportanceScore(id int64, score float64) error {
 	_, err := s.db.Exec(`UPDATE articles SET importance_score = ? WHERE id = ?`, score, id)
@@ -575,7 +587,7 @@ func (s *articleStore) GetArticlesWithoutSummary(limit int) ([]Article, error) {
 		limit = 100
 	}
 	rows, err := s.db.Query(`
-		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(importance_score,0), summary_generated_at
+		SELECT id, title, url, source, COALESCE(source_url,''), category, COALESCE(summary,''), COALESCE(content_html,''), COALESCE(image_url,''), published_at, collected_at, language, COALESCE(ai_summary,''), COALESCE(translated_title,''), COALESCE(importance_score,0), summary_generated_at
 		FROM articles
 		WHERE ai_summary IS NULL OR ai_summary = ''
 		ORDER BY collected_at DESC
@@ -594,7 +606,7 @@ func (s *articleStore) GetArticlesWithoutSummary(limit int) ([]Article, error) {
 			&a.SourceURL, &a.Category, &a.Summary,
 			&a.ContentHTML, &a.ImageURL, &a.PublishedAt,
 			&a.CollectedAt, &a.Language,
-			&a.AISummary, &a.ImportanceScore, &a.SummaryGeneratedAt,
+			&a.AISummary, &a.TranslatedTitle, &a.ImportanceScore, &a.SummaryGeneratedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan article without summary: %w", err)
 		}
