@@ -144,7 +144,8 @@ func BuildArticleContent(articles []store.Article, title string) string {
 			buf.WriteString(fmt.Sprintf(`<p style="color:#aaa;font-size:13px;margin:0 0 20px;">📍 来源：%s</p>`, a.Source))
 		}
 		if a.URL != "" {
-			buf.WriteString(fmt.Sprintf(`<p style="color:#576b95;font-size:13px;margin:0 0 20px;"><a href="%s">阅读原文</a></p>`, a.URL))
+			// Show as plain text (not clickable) since WeChat blocks external links
+			buf.WriteString(fmt.Sprintf(`<p style="color:#576b95;font-size:13px;margin:0 0 20px;">🔗 原文链接（长按复制到浏览器打开）：%s</p>`, a.URL))
 		}
 		buf.WriteString(`<hr style="border:none;border-top:1px solid #f0f0f0;margin:15px 0;">`)
 	}
