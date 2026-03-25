@@ -220,14 +220,14 @@ func (p *Publisher) PublishTopArticles() error {
 	}
 
 	// Publish
-	mediaID, err := p.client.CreateDraft([]ThumbInfo{
+	_, err = p.client.CreateDraft([]ThumbInfo{
 		{
 			ThumbMediaID:     thumbMediaID,
 			Author:           "AI News Hub",
 			Title:            articleTitle,
 			Content:          content,
 			Digest:           digest,
-			ContentSourceURL:  "",
+			ContentSourceURL:  "https://example.com",
 			CanComment:       1,
 			Comment:          1,
 		},
@@ -235,10 +235,7 @@ func (p *Publisher) PublishTopArticles() error {
 	if err != nil {
 		return fmt.Errorf("create draft: %w", err)
 	}
-	if err := p.client.PublishDraft(mediaID); err != nil {
-		return fmt.Errorf("publish draft: %w", err)
-	}
-
-	log.Printf("[wechat] ✅ article published: %s", articleTitle)
+	// PublishDraft API not supported for subscription accounts; just log success
+	log.Printf("[wechat] ✅ draft created (manual publish needed at mp.weixin.qq.com): %s", articleTitle)
 	return nil
 }

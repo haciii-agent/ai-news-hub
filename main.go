@@ -84,7 +84,7 @@ func main() {
 	collectScheduler := collector.NewCollectScheduler(&cfg.Collector, articleStore)
 
 	// Initialize API server (wires collector, classifier, store, summarizer).
-	srv, err := api.NewServer(db, cfg, version, articleStore, collectScheduler, summarizer)
+	srv, err := api.NewServer(db, cfg, version, articleStore, collectScheduler, summarizer, wechatPub)
 	if err != nil {
 		log.Fatalf("[main] failed to init server: %v", err)
 	}

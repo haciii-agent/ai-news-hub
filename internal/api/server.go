@@ -15,6 +15,7 @@ import (
 	"ai-news-hub/internal/classifier"
 	"ai-news-hub/internal/store"
 	"ai-news-hub/internal/static"
+	"ai-news-hub/internal/wechat"
 )
 
 // Server holds all dependencies for the HTTP server.
@@ -32,11 +33,12 @@ type Server struct {
 	CollectSvc      *CollectService
 	Classifier      *classifier.Manager
 	Summarizer      *ai.Summarizer
+	WechatPublisher *wechat.Publisher
 	Version         string
 }
 
 // NewServer creates a fully-wired HTTP server with all routes registered.
-func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore store.ArticleStore, collectScheduler *collector.CollectScheduler, summarizer *ai.Summarizer) (*Server, error) {
+func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore store.ArticleStore, collectScheduler *collector.CollectScheduler, summarizer *ai.Summarizer, wechatPub *wechat.Publisher) (*Server, error) {
 	userStore := store.NewUserStore(db)
 
 	// Initialize classifier
@@ -51,8 +53,9 @@ func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore stor
 		Store:      articleStore,
 		UserStore:  userStore,
 		Classifier: clr,
-		Summarizer: summarizer,
-		Version:    version,
+		Summarizer:      summarizer,
+		WechatPublisher: wechatPub,
+		Version:         version,
 		CollectSvc: &CollectService{
 			Scheduler:  collectScheduler,
 			Classifier: clr,
@@ -79,6 +82,24 @@ func NewServer(db *sql.DB, cfg *config.Config, version string, articleStore stor
 	return srv, nil
 }
 
+// HandlePublishWechat POST /api/v1/publish/wechat — 手动触发微信公众号发布.
+func (s *Server) HandlePublishWechat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "only POST allowed")
+		return
+	}
+	if s.WechatPublisher == nil || !s.WechatPublisher.Available() {
+		writeError(w, http.StatusServiceUnavailable, "wechat publisher not available")
+		return
+	}
+	if err := s.WechatPublisher.PublishTopArticles(); err != nil {
+		log.Printf("[api] wechat publish error: %v", err)
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("publish failed: %v", err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "message": "publish triggered"})
+}
+
 // Handler returns the main HTTP handler with all routes registered.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -93,6 +114,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/categories", s.categoriesHandler)
 	mux.HandleFunc("/api/v1/collect", s.CollectSvc.HandleCollect)
 	mux.HandleFunc("/api/v1/collect/status", s.CollectSvc.HandleCollectStatus)
+	mux.HandleFunc("/api/v1/publish/wechat", s.HandlePublishWechat)
 	mux.HandleFunc("/api/v1/stats", s.CollectSvc.HandleStats)
 	mux.HandleFunc("/api/v1/articles/cleanup", s.CollectSvc.HandleCleanup)
 	mux.HandleFunc("/api/v1/sources", s.CollectSvc.HandleSources)
