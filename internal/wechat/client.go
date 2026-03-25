@@ -37,7 +37,7 @@ func NewClient(cfg config.WeChatConfig) *Client {
 	return &Client{
 		appID:      cfg.GetAppID(),
 		secret:     cfg.GetSecret(),
-		accountID:  cfg.AccountID,
+		accountID:  cfg.GetAccountID(),
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -144,7 +144,7 @@ type ThumbInfo struct {
 	Title        string `json:"title"`
 	Content      string `json:"content"`
 	Digest       string `json:"digest,omitempty"`
-	ContentSourceURL string `json:"content_source_url,omitempty"`
+	ContentSourceURL string `json:"content_source_url"`
 	CanComment   int    `json:"can_comment"`
 	Comment      int    `json:"comment"`
 }

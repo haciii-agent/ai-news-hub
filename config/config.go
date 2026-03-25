@@ -109,6 +109,14 @@ type WeChatConfig struct {
 	AccountID string `yaml:"account_id"`
 }
 
+// GetAccountID returns the AccountID, preferring environment variable.
+func (w WeChatConfig) GetAccountID() string {
+	if v := os.Getenv("WX_ACCOUNT_ID"); v != "" {
+		return v
+	}
+	return w.AccountID
+}
+
 // IsEnabled returns true if WeChat publishing is configured.
 func (w WeChatConfig) IsEnabled() bool {
 	return w.GetAppID() != "" && w.GetSecret() != ""

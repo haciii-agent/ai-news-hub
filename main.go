@@ -75,7 +75,7 @@ func main() {
 	// Initialize WeChat publisher (nil if not configured).
 	wechatPub := wechat.NewPublisher(cfg.WeChat, articleStore)
 	if wechatPub.Available() {
-		log.Printf("[main] WeChat publisher enabled (account: %s)", cfg.WeChat.AccountID)
+		log.Printf("[main] WeChat publisher enabled (account: %s, from env: %s)", cfg.WeChat.AccountID, cfg.WeChat.GetAccountID())
 	} else {
 		log.Printf("[main] WeChat publisher disabled (not configured or unavailable)")
 	}

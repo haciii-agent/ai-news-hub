@@ -226,7 +226,7 @@ func (s *Summarizer) GenerateSummaryForArticle(article store.Article, articleSto
 		parts := strings.SplitN(result, "\n---\n", 2)
 		if len(parts) == 2 {
 			translatedTitle := strings.TrimSpace(parts[0])
-			summary := strings.TrimSpace(parts[1])
+			summary := strings.TrimSpace(stripThinkBlocks(parts[1]))
 			if err := articleStore.UpdateTranslatedTitle(article.ID, translatedTitle); err != nil {
 				log.Printf("[ai] warning: failed to save translated title for article %d: %v", article.ID, err)
 			}
@@ -236,8 +236,13 @@ func (s *Summarizer) GenerateSummaryForArticle(article store.Article, articleSto
 			log.Printf("[ai] generated summary (with translation) for article %d: %s", article.ID, article.Title[:min(50, len(article.Title))])
 			return nil
 		}
-		// If format is unexpected, save whole result as summary
+		// If format is unexpected, strip think blocks and save whole result as summary
 		log.Printf("[ai] warning: unexpected en article format for %d, saving whole result", article.ID)
+		result = stripThinkBlocks(result)
+		// After stripping, try to extract content after ---
+		if parts := strings.SplitN(result, "\n---\n", 2); len(parts) == 2 {
+			result = strings.TrimSpace(parts[1])
+		}
 	}
 
 	if err := articleStore.UpdateAISummary(article.ID, result); err != nil {

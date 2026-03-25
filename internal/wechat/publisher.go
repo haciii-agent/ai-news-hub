@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,35 @@ import (
 )
 
 // Publisher selects top articles and publishes to WeChat.
+
+// sanitizeWX strips <think>...</think> blocks and leading markdown artifacts from WeChat-bound text.
+func sanitizeWX(text string) string {
+	// Strip think blocks: valid form <think>...</think>
+	re := regexp.MustCompile(`<think>[\s\S]*?
+</think>
+
+`)
+	text = re.ReplaceAllString(text, "")
+	// Also catch broken variants: </think> (missing _), </think >, </thinkX>
+	re2 := regexp.MustCompile(`</think[^>]*>`)
+	text = re2.ReplaceAllString(text, "")
+	// Fallback: if still has <think> anywhere, cut there
+	if idx := strings.Index(text, "<think>"); idx != -1 {
+		text = strings.TrimSpace(text[:idx])
+	}
+	// Strip common markdown/prefix lines at start
+	lines := strings.Split(text, "\n")
+	var clean []string
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if l == "" || strings.HasPrefix(l, "#") || strings.HasPrefix(l, "**") {
+			continue
+		}
+		clean = append(clean, l)
+	}
+	return strings.Join(clean, "\n")
+}
+
 type Publisher struct {
 	client  *Client
 	articleStore store.ArticleStore
@@ -90,17 +120,17 @@ func (p *Publisher) SelectTopArticles(limit int) ([]store.Article, error) {
 // BuildArticleContent builds HTML content for a WeChat article from a list of news.
 func BuildArticleContent(articles []store.Article, title string) string {
 	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf(`<h2 style="text-align:center;color:#1a1a1a;font-size:22px;margin:20px 0;">%s</h2>`, title))
-	buf.WriteString(fmt.Sprintf(`<p style="color:#888;font-size:14px;margin-bottom:30px;text-align:center;">%s · AI 科技资讯精选</p>`, time.Now().Format("2006-01-02"), "AI News Hub"))
+	// header title removed
+	buf.WriteString(fmt.Sprintf(`<p style="color:#888;font-size:14px;margin-bottom:30px;text-align:center;">%s · AI 科技资讯精选</p>`, time.Now().Format("2006-01-02")))
 
 	buf.WriteString(`<hr style="border:none;border-top:1px solid #eee;margin:20px 0;">`)
 
 	for i, a := range articles {
 		displayTitle := a.Title
 		if a.TranslatedTitle != "" {
-			displayTitle = a.TranslatedTitle
+			displayTitle = strings.TrimSpace(sanitizeWX(a.TranslatedTitle))
 		}
-		summary := a.AISummary
+		summary := sanitizeWX(a.AISummary)
 		if summary == "" {
 			summary = a.Summary
 		}
@@ -156,10 +186,10 @@ func (p *Publisher) PublishTopArticles() error {
 	// Build content
 	content := BuildArticleContent(articles, "")
 
-	// Create digest (first 54 chars of first article summary)
+	// Create digest (first 54 chars of first article summary, sanitized)
 	digest := ""
 	for _, a := range articles {
-		if s := a.AISummary; s != "" {
+		if s := sanitizeWX(a.AISummary); s != "" {
 			if len(s) > 54 {
 				s = s[:54] + "..."
 			}
@@ -197,7 +227,7 @@ func (p *Publisher) PublishTopArticles() error {
 			Title:            articleTitle,
 			Content:          content,
 			Digest:           digest,
-			ContentSourceURL:  "https://github.com/haciii-agent/ai-news-hub",
+			ContentSourceURL:  "",
 			CanComment:       1,
 			Comment:          1,
 		},
