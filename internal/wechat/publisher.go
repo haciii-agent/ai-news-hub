@@ -52,15 +52,39 @@ func (p *Publisher) SelectTopArticles(limit int) ([]store.Article, error) {
 		}
 	}
 
-	// Sort by importance score descending
+	// Sort by importance score descending, then by id descending for stability
 	sort.Slice(recent, func(i, j int) bool {
-		return recent[i].ImportanceScore > recent[j].ImportanceScore
+		if recent[i].ImportanceScore != recent[j].ImportanceScore {
+			return recent[i].ImportanceScore > recent[j].ImportanceScore
+		}
+		return recent[i].ID > recent[j].ID
 	})
 
-	if len(recent) > limit {
-		recent = recent[:limit]
+	// Prefer articles with images (微信要求必须有封面图)
+	withImages := make([]store.Article, 0)
+	withoutImages := make([]store.Article, 0)
+	for _, a := range recent {
+		if a.ImageURL != "" {
+			withImages = append(withImages, a)
+		} else {
+			withoutImages = append(withoutImages, a)
+		}
 	}
-	return recent, nil
+
+	// Build final list: all with images first, then fill rest from withoutImages
+	var result []store.Article
+	result = append(result, withImages...)
+	for _, a := range withoutImages {
+		if len(result) >= limit {
+			break
+		}
+		result = append(result, a)
+	}
+
+	if len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
 }
 
 // BuildArticleContent builds HTML content for a WeChat article from a list of news.
@@ -146,7 +170,7 @@ func (p *Publisher) PublishTopArticles() error {
 
 	// Get thumb media_id from first article's image
 	thumbMediaID := ""
-	for _, a := range articles {
+	for i, a := range articles {
 		if a.ImageURL != "" {
 			tid, err := p.client.FetchThumbImage(a.ImageURL)
 			if err == nil && tid != "" {
@@ -156,6 +180,13 @@ func (p *Publisher) PublishTopArticles() error {
 			}
 			log.Printf("[wechat] thumb fetch failed for %s: %v", a.ImageURL, err)
 		}
+		if i > 10 {
+			break
+		}
+	}
+	// Fallback: if still no thumb, warn but continue (微信可能允许空封面)
+	if thumbMediaID == "" {
+		log.Printf("[wechat] WARNING: no thumb image available for WeChat draft")
 	}
 
 	// Publish
@@ -166,7 +197,7 @@ func (p *Publisher) PublishTopArticles() error {
 			Title:            articleTitle,
 			Content:          content,
 			Digest:           digest,
-			ContentSourceURL: "",
+			ContentSourceURL:  "https://github.com/haciii-agent/ai-news-hub",
 			CanComment:       1,
 			Comment:          1,
 		},

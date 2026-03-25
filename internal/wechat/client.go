@@ -15,6 +15,9 @@ import (
 	"ai-news-hub/config"
 )
 
+// ensure io is used
+var _ = io.ReadAll
+
 // Client is a WeChat public account API client.
 type Client struct {
 	appID       string
@@ -153,20 +156,44 @@ func (c *Client) CreateDraft(articles []ThumbInfo) (string, error) {
 		return "", fmt.Errorf("wechat client not available (check appid/secret)")
 	}
 
+	token, err := c.getAccessToken()
+	if err != nil {
+		return "", fmt.Errorf("get access token: %w", err)
+	}
+
 	payload := map[string]interface{}{
 		"articles": articles,
 	}
+	bodyBytes, _ := json.Marshal(payload)
+	log.Printf("[wechat] CreateDraft request: %s", string(bodyBytes))
 
-	data, err := c.apiCall("POST", "/cgi-bin/draft/add", payload)
+	req, err := http.NewRequest("POST",
+		"https://api.weixin.qq.com/cgi-bin/draft/add?access_token="+token,
+		bytes.NewReader(bodyBytes))
 	if err != nil {
-		return "", fmt.Errorf("create draft: %w", err)
+		return "", fmt.Errorf("create request: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("http call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	log.Printf("[wechat] CreateDraft response: %s", string(respBytes))
 
 	var result struct {
+		ErrCode int    `json:"errcode"`
+		ErrMsg  string `json:"errmsg"`
 		MediaID string `json:"media_id"`
 	}
-	if err := json.Unmarshal(data, &result); err != nil {
+	if err := json.Unmarshal(respBytes, &result); err != nil {
 		return "", fmt.Errorf("parse draft response: %w", err)
+	}
+	if result.ErrCode != 0 {
+		return "", fmt.Errorf("create draft: API error %d: %s", result.ErrCode, result.ErrMsg)
 	}
 	log.Printf("[wechat] draft created: media_id=%s (%d articles)", result.MediaID, len(articles))
 	return result.MediaID, nil
@@ -178,10 +205,39 @@ func (c *Client) PublishDraft(mediaID string) error {
 		return fmt.Errorf("wechat client not available")
 	}
 
-	payload := map[string]string{"media_id": mediaID}
-	_, err := c.apiCall("POST", "/cgi-bin/draft/publish", payload)
+	token, err := c.getAccessToken()
 	if err != nil {
-		return fmt.Errorf("publish draft: %w", err)
+		return fmt.Errorf("get access token: %w", err)
+	}
+
+	payload := map[string]string{"media_id": mediaID}
+	bodyBytes, _ := json.Marshal(payload)
+	req, err := http.NewRequest("POST",
+		"https://api.weixin.qq.com/cgi-bin/draft/publish?access_token="+token,
+		bytes.NewReader(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http call: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
+	log.Printf("[wechat] PublishDraft response: %s", string(respBytes))
+
+	var result struct {
+		ErrCode int    `json:"errcode"`
+		ErrMsg  string `json:"errmsg"`
+	}
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return fmt.Errorf("parse publish response: %w", err)
+	}
+	if result.ErrCode != 0 {
+		return fmt.Errorf("publish draft: API error %d: %s", result.ErrCode, result.ErrMsg)
 	}
 	log.Printf("[wechat] draft published: media_id=%s", mediaID)
 	return nil
@@ -213,12 +269,33 @@ func (c *Client) FetchThumbImage(imageURL string) (string, error) {
 		return "", fmt.Errorf("wechat client not available")
 	}
 
-	// Download image
+	// Download image into buffer first
 	resp, err := c.httpClient.Get(imageURL)
 	if err != nil {
 		return "", fmt.Errorf("download image: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("download failed: status %d", resp.StatusCode)
+	}
+
+	// Read body with size limit (10MB)
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
+	if err != nil {
+		return "", fmt.Errorf("read body: %w", err)
+	}
+	log.Printf("[wechat] fetched image size=%d url=%s", len(bodyBytes), imageURL)
+
+	// WeChat requires thumb images between 200KB and 2MB
+	const minSize = 200 * 1024
+	const maxSize = 2 * 1024 * 1024
+	if len(bodyBytes) < minSize {
+		return "", fmt.Errorf("image too small: %d bytes (min %d)", len(bodyBytes), minSize)
+	}
+	if len(bodyBytes) > maxSize {
+		return "", fmt.Errorf("image too large: %d bytes (max %d)", len(bodyBytes), maxSize)
+	}
 
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
@@ -226,14 +303,13 @@ func (c *Client) FetchThumbImage(imageURL string) (string, error) {
 	}
 
 	// Upload to WeChat as temporary material (thumb)
-	// WeChat requires form-data upload
 	body := &bytes.Buffer{}
 	writer := multipartWriter{Body: body}
-	writer.WriteFile("media", "thumb.jpg", contentType, resp.Body)
+	writer.WriteFile("media", "thumb.jpg", contentType, bytes.NewReader(bodyBytes))
 
 	token, _ := c.getAccessToken()
 	req, err := http.NewRequest("POST",
-		"https://api.weixin.qq.com/cgi-bin/media/upload?access_token="+token+"&type=thumb",
+		"https://api.weixin.qq.com/cgi-bin/material/add_material?access_token="+token+"&type=thumb",
 		body)
 	if err != nil {
 		return "", err
@@ -246,18 +322,26 @@ func (c *Client) FetchThumbImage(imageURL string) (string, error) {
 	}
 	defer resp2.Body.Close()
 
+	respBytes, _ := io.ReadAll(io.LimitReader(resp2.Body, 1024*1024))
+	log.Printf("[wechat] thumb upload response status=%d body=%s", resp2.StatusCode, string(respBytes))
+
 	var result struct {
-		MediaID string `json:"thumb_media_id"`
-		ErrCode int    `json:"errcode"`
-		ErrMsg  string `json:"errmsg"`
+		MediaID  string `json:"media_id"`  // for permanent material
+		ThumbID  string `json:"thumb_media_id"` // for temporary material
+		ErrCode  int    `json:"errcode"`
+		ErrMsg   string `json:"errmsg"`
 	}
-	if err := json.NewDecoder(resp2.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBytes, &result); err != nil {
 		return "", fmt.Errorf("parse thumb response: %w", err)
 	}
 	if result.ErrCode != 0 {
 		return "", fmt.Errorf("thumb upload error %d: %s", result.ErrCode, result.ErrMsg)
 	}
-	return result.MediaID, nil
+	mediaID := result.MediaID
+	if mediaID == "" {
+		mediaID = result.ThumbID
+	}
+	return mediaID, nil
 }
 
 // multipartWriter is a minimal helper for form-data uploads.
