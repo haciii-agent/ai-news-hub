@@ -144,10 +144,38 @@ func (p *Publisher) PublishTopArticles() error {
 		}
 	}
 
+	// Get thumb media_id from first article's image
+	thumbMediaID := ""
+	for _, a := range articles {
+		if a.ImageURL != "" {
+			tid, err := p.client.FetchThumbImage(a.ImageURL)
+			if err == nil && tid != "" {
+				thumbMediaID = tid
+				log.Printf("[wechat] using thumb from article %d: %s", a.ID, a.ImageURL)
+				break
+			}
+			log.Printf("[wechat] thumb fetch failed for %s: %v", a.ImageURL, err)
+		}
+	}
+
 	// Publish
-	err = p.client.PublishArticle(articleTitle, "AI News Hub", content, digest, "")
+	mediaID, err := p.client.CreateDraft([]ThumbInfo{
+		{
+			ThumbMediaID:     thumbMediaID,
+			Author:           "AI News Hub",
+			Title:            articleTitle,
+			Content:          content,
+			Digest:           digest,
+			ContentSourceURL: "",
+			CanComment:       1,
+			Comment:          1,
+		},
+	})
 	if err != nil {
-		return fmt.Errorf("publish to wechat: %w", err)
+		return fmt.Errorf("create draft: %w", err)
+	}
+	if err := p.client.PublishDraft(mediaID); err != nil {
+		return fmt.Errorf("publish draft: %w", err)
 	}
 
 	log.Printf("[wechat] ✅ article published: %s", articleTitle)

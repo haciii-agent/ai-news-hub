@@ -220,12 +220,16 @@ func (c *Client) FetchThumbImage(imageURL string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
 	// Upload to WeChat as temporary material (thumb)
 	// WeChat requires form-data upload
 	body := &bytes.Buffer{}
 	writer := multipartWriter{Body: body}
-	writer.WriteField("media", imageURL)
-	writer.WriteFile("thumb", "image.jpg", resp.Header.Get("Content-Type"), resp.Body)
+	writer.WriteFile("media", "thumb.jpg", contentType, resp.Body)
 
 	token, _ := c.getAccessToken()
 	req, err := http.NewRequest("POST",
