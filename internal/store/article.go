@@ -96,13 +96,12 @@ func NewArticleStore(db *sql.DB) ArticleStore {
 	return &articleStore{db: db}
 }
 
-// InsertArticle inserts a single article. Duplicate URLs are silently skipped
-// (returns nil on conflict so the caller treats it as success).
+// InsertArticle inserts a single article. Duplicate URLs update collected_at.
 func (s *articleStore) InsertArticle(article *Article) error {
 	_, err := s.db.Exec(`
-		INSERT INTO articles (title, url, source, source_url, category, summary, content_html, image_url, published_at, language)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(url) DO NOTHING
+		INSERT INTO articles (title, url, source, source_url, category, summary, content_html, image_url, published_at, language, collected_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(url) DO UPDATE SET collected_at = excluded.collected_at
 	`,
 		article.Title,
 		article.URL,
@@ -114,6 +113,7 @@ func (s *articleStore) InsertArticle(article *Article) error {
 		article.ImageURL,
 		article.PublishedAt,
 		article.Language,
+		article.CollectedAt,
 	)
 	return err
 }
@@ -132,9 +132,9 @@ func (s *articleStore) BatchInsertArticles(articles []Article) (inserted int, sk
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO articles (title, url, source, source_url, category, summary, content_html, image_url, published_at, language)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(url) DO NOTHING
+		INSERT INTO articles (title, url, source, source_url, category, summary, content_html, image_url, published_at, language, collected_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(url) DO UPDATE SET collected_at = excluded.collected_at
 	`)
 	if err != nil {
 		return 0, 0, fmt.Errorf("prepare batch insert: %w", err)
@@ -154,6 +154,7 @@ func (s *articleStore) BatchInsertArticles(articles []Article) (inserted int, sk
 			a.ImageURL,
 			a.PublishedAt,
 			a.Language,
+			a.CollectedAt,
 		)
 		if err != nil {
 			return inserted, skipped, fmt.Errorf("batch insert row %d: %w", i, err)
