@@ -291,6 +291,7 @@ func (s *articleStore) GetArticleByID(id int64) (*Article, error) {
 		&a.CollectedAt,
 		&a.Language,
 		&a.AISummary,
+		&a.TranslatedTitle,
 		&a.ImportanceScore,
 		&a.SummaryGeneratedAt,
 	)
