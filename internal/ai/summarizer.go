@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,9 @@ import (
 	"ai-news-hub/config"
 	"ai-news-hub/internal/store"
 )
+
+// thinkBlockRegex matches <think>...</think> reasoning blocks.
+var thinkBlockRegex = regexp.MustCompile(`<think>[\s\S]*?</think>`)
 
 // Summarizer generates AI summaries for articles using an OpenAI-compatible LLM API.
 type Summarizer struct {
@@ -81,27 +85,32 @@ type chatResponse struct {
 }
 
 const cnSummaryPromptTemplate = `你是一个科技新闻编辑。请根据以下信息生成150-300字的中文新闻摘要。
-要求：信息准确、重点突出、语言简洁专业、适合信息流展示。
+要求：
+1. 信息准确、重点突出、语言简洁专业、适合信息流展示
+2. 只输出摘要正文，不要输出任何思考过程、推理步骤、分析说明
+3. 回复内容中不能包含 <think> 标签、XML 标签、markdown 格式符号（如 ##、**、- 等）
+4. 直接输出一段纯文本，不要前缀、不要标题、不要分隔线
 
 标题：%s
 原文摘要：%s
 来源：%s
 
-请直接输出摘要文本，不要添加任何前缀或格式。`
+请直接输出150-300字的纯摘要文本：`
 
 // enSummaryPromptTemplate is used for English articles (language="en").
 // The AI returns "[translated title]\n---\n[chinese summary]".
 const enSummaryPromptTemplate = `你是一个科技新闻编辑。请将以下英文科技新闻翻译成中文，并生成一段150-300字的摘要。
-要求：翻译准确、摘要信息准确、重点突出、语言简洁专业、适合信息流展示。
+要求：
+1. 翻译准确、摘要信息准确、重点突出、语言简洁专业、适合信息流展示
+2. 只输出翻译后标题和摘要正文，不要输出任何思考过程、推理步骤、分析说明
+3. 回复内容中不能包含 <think> 标签、XML 标签、markdown 格式符号
+4. 直接输出：翻译后的中文标题一行，换行后直接输出纯摘要正文
 
 英文标题：%s
 英文摘要：%s
 来源：%s
 
-请按以下格式输出：
-[翻译后的中文标题]
----
-[中文摘要]`
+格式：直接输出一行中文标题，换行后直接输出纯摘要，不要任何前缀符号：`
 
 // GenerateSummary generates a Chinese summary for a single article.
 // For English articles (language="en"), the output includes the translated title separated by "---".
@@ -196,6 +205,11 @@ func (s *Summarizer) GenerateSummary(article store.Article) (string, error) {
 		return "", fmt.Errorf("API returned empty summary")
 	}
 
+	// Post-process: strip <think> blocks and any markdown/prefix artifacts
+	result = stripThinkBlocks(result)
+	result = stripMarkdownPrefixes(result)
+	result = strings.TrimSpace(result)
+
 	return result, nil
 }
 
@@ -269,4 +283,34 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// stripThinkBlocks removes <think>...</think> reasoning blocks from text.
+func stripThinkBlocks(text string) string {
+	// Remove <think>...</think> blocks
+	result := thinkBlockRegex.ReplaceAllString(text, "")
+	// Also handle <think> without a closing tag (take everything after it as discard)
+	if idx := strings.Index(result, "<think>"); idx != -1 {
+		result = strings.TrimSpace(result[:idx])
+	}
+	return result
+}
+
+// stripMarkdownPrefixes removes common markdown/prefix artifacts from the start of text.
+func stripMarkdownPrefixes(text string) string {
+	lines := strings.Split(text, "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		trimmed := strings.TrimPrefix(line, "#")
+		trimmed = strings.TrimPrefix(trimmed, "##")
+		trimmed = strings.TrimPrefix(trimmed, "**")
+		trimmed = strings.TrimRight(trimmed, "**")
+		trimmed = strings.TrimSpace(trimmed)
+		// Skip lines that look like metadata prefixes (e.g., "标题：" "来源：" alone on a line)
+		if len(trimmed) == 0 {
+			continue
+		}
+		cleanLines = append(cleanLines, trimmed)
+	}
+	return strings.Join(cleanLines, "\n")
 }
